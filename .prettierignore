@@ -2,3 +2,8 @@ node_modules
 dist
 coverage
 package-lock.json
+
+# the design package: the spec, not ours to restyle
+docs/
+CLAUDE.md
+README-START-HERE.md

@@ -1,0 +1,547 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-18T00:00:00Z",
+  "startDate": "2026-01-01",
+  "companies": [
+    {
+      "id": "stripe.com",
+      "date": "2026-01-01",
+      "domain": "stripe.com",
+      "name": "Stripe",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=stripe.com&sz=128",
+      "sectors": ["Fintech", "Payments"],
+      "businessModel": ["B2B"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2010,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 9400000000,
+      "headcount": 8500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "openai.com",
+      "date": "2026-01-02",
+      "domain": "openai.com",
+      "name": "OpenAI",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=openai.com&sz=128",
+      "sectors": ["AI / ML"],
+      "businessModel": ["B2B", "B2C"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2015,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 57900000000,
+      "headcount": 3000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "klarna.com",
+      "date": "2026-01-03",
+      "domain": "klarna.com",
+      "name": "Klarna",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=klarna.com&sz=128",
+      "sectors": ["Fintech", "Payments"],
+      "businessModel": ["B2C", "B2B2C"],
+      "hqCountry": "SE",
+      "region": "Europe",
+      "foundedYear": 2005,
+      "fundingStage": "Public",
+      "totalFundingUsd": 4500000000,
+      "headcount": 4000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "revolut.com",
+      "date": "2026-01-04",
+      "domain": "revolut.com",
+      "name": "Revolut",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=revolut.com&sz=128",
+      "sectors": ["Fintech"],
+      "businessModel": ["B2C"],
+      "hqCountry": "GB",
+      "region": "Europe",
+      "foundedYear": 2015,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 2000000000,
+      "headcount": 10000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "spotify.com",
+      "date": "2026-01-05",
+      "domain": "spotify.com",
+      "name": "Spotify",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=spotify.com&sz=128",
+      "sectors": ["Media & Entertainment", "Consumer"],
+      "businessModel": ["B2C"],
+      "hqCountry": "SE",
+      "region": "Europe",
+      "foundedYear": 2006,
+      "fundingStage": "Public",
+      "totalFundingUsd": 2600000000,
+      "headcount": 9000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "airbnb.com",
+      "date": "2026-01-06",
+      "domain": "airbnb.com",
+      "name": "Airbnb",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=airbnb.com&sz=128",
+      "sectors": ["Travel & Hospitality", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2008,
+      "fundingStage": "Public",
+      "totalFundingUsd": 6400000000,
+      "headcount": 7300,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "figma.com",
+      "date": "2026-01-07",
+      "domain": "figma.com",
+      "name": "Figma",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=figma.com&sz=128",
+      "sectors": ["Developer Tools", "Enterprise Software"],
+      "businessModel": ["B2B"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2012,
+      "fundingStage": "Public",
+      "totalFundingUsd": 749000000,
+      "headcount": 1500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "datadoghq.com",
+      "date": "2026-01-08",
+      "domain": "datadoghq.com",
+      "name": "Datadog",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=datadoghq.com&sz=128",
+      "sectors": ["Data & Analytics", "Developer Tools"],
+      "businessModel": ["B2B"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2010,
+      "fundingStage": "Public",
+      "totalFundingUsd": 147900000,
+      "headcount": 5200,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "n26.com",
+      "date": "2026-01-09",
+      "domain": "n26.com",
+      "name": "N26",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=n26.com&sz=128",
+      "sectors": ["Fintech"],
+      "businessModel": ["B2C"],
+      "hqCountry": "DE",
+      "region": "Europe",
+      "foundedYear": 2013,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 1800000000,
+      "headcount": 1500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "monzo.com",
+      "date": "2026-01-10",
+      "domain": "monzo.com",
+      "name": "Monzo",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=monzo.com&sz=128",
+      "sectors": ["Fintech"],
+      "businessModel": ["B2C"],
+      "hqCountry": "GB",
+      "region": "Europe",
+      "foundedYear": 2015,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 1500000000,
+      "headcount": 3500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "deliveroo.co.uk",
+      "date": "2026-01-11",
+      "domain": "deliveroo.co.uk",
+      "name": "Deliveroo",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=deliveroo.co.uk&sz=128",
+      "sectors": ["Food & Beverage", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "GB",
+      "region": "Europe",
+      "foundedYear": 2013,
+      "fundingStage": "Public",
+      "totalFundingUsd": 1700000000,
+      "headcount": 3000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "glovoapp.com",
+      "date": "2026-01-12",
+      "domain": "glovoapp.com",
+      "name": "Glovo",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=glovoapp.com&sz=128",
+      "sectors": ["Food & Beverage", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "ES",
+      "region": "Europe",
+      "foundedYear": 2015,
+      "fundingStage": "Acquired",
+      "totalFundingUsd": 1200000000,
+      "headcount": 2500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "cabify.com",
+      "date": "2026-01-13",
+      "domain": "cabify.com",
+      "name": "Cabify",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=cabify.com&sz=128",
+      "sectors": ["Mobility & Automotive", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "ES",
+      "region": "Europe",
+      "foundedYear": 2011,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 500000000,
+      "headcount": 1200,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "wallapop.com",
+      "date": "2026-01-14",
+      "domain": "wallapop.com",
+      "name": "Wallapop",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=wallapop.com&sz=128",
+      "sectors": ["E-commerce", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "ES",
+      "region": "Europe",
+      "foundedYear": 2013,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 300000000,
+      "headcount": 400,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "factorialhr.com",
+      "date": "2026-01-15",
+      "domain": "factorialhr.com",
+      "name": "Factorial",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=factorialhr.com&sz=128",
+      "sectors": ["HR & Future of Work", "Enterprise Software"],
+      "businessModel": ["B2B"],
+      "hqCountry": "ES",
+      "region": "Europe",
+      "foundedYear": 2016,
+      "fundingStage": "Series C",
+      "totalFundingUsd": 230000000,
+      "headcount": 1000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "mistral.ai",
+      "date": "2026-01-16",
+      "domain": "mistral.ai",
+      "name": "Mistral AI",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=mistral.ai&sz=128",
+      "sectors": ["AI / ML"],
+      "businessModel": ["B2B"],
+      "hqCountry": "FR",
+      "region": "Europe",
+      "foundedYear": 2023,
+      "fundingStage": "Series C",
+      "totalFundingUsd": 1300000000,
+      "headcount": 250,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "huggingface.co",
+      "date": "2026-01-17",
+      "domain": "huggingface.co",
+      "name": "Hugging Face",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=huggingface.co&sz=128",
+      "sectors": ["AI / ML", "Developer Tools"],
+      "businessModel": ["B2B"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2016,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 395000000,
+      "headcount": 300,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "anthropic.com",
+      "date": "2026-01-18",
+      "domain": "anthropic.com",
+      "name": "Anthropic",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=anthropic.com&sz=128",
+      "sectors": ["AI / ML"],
+      "businessModel": ["B2B", "B2C"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2021,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 17000000000,
+      "headcount": 1500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "canva.com",
+      "date": "2026-01-19",
+      "domain": "canva.com",
+      "name": "Canva",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=canva.com&sz=128",
+      "sectors": ["Enterprise Software", "Consumer"],
+      "businessModel": ["B2C", "B2B"],
+      "hqCountry": "AU",
+      "region": "Oceania",
+      "foundedYear": 2013,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 580000000,
+      "headcount": 4500,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "shopify.com",
+      "date": "2026-01-20",
+      "domain": "shopify.com",
+      "name": "Shopify",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=shopify.com&sz=128",
+      "sectors": ["E-commerce", "SaaS Infrastructure"],
+      "businessModel": ["B2B"],
+      "hqCountry": "CA",
+      "region": "North America",
+      "foundedYear": 2006,
+      "fundingStage": "Public",
+      "totalFundingUsd": 122000000,
+      "headcount": 8100,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "nubank.com.br",
+      "date": "2026-01-21",
+      "domain": "nubank.com.br",
+      "name": "Nubank",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=nubank.com.br&sz=128",
+      "sectors": ["Fintech"],
+      "businessModel": ["B2C"],
+      "hqCountry": "BR",
+      "region": "South America",
+      "foundedYear": 2013,
+      "fundingStage": "Public",
+      "totalFundingUsd": 4000000000,
+      "headcount": 8000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "rappi.com",
+      "date": "2026-01-22",
+      "domain": "rappi.com",
+      "name": "Rappi",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=rappi.com&sz=128",
+      "sectors": ["Food & Beverage", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "CO",
+      "region": "South America",
+      "foundedYear": 2015,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 2300000000,
+      "headcount": 5000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "grab.com",
+      "date": "2026-01-23",
+      "domain": "grab.com",
+      "name": "Grab",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=grab.com&sz=128",
+      "sectors": ["Mobility & Automotive", "Marketplace"],
+      "businessModel": ["Marketplace", "B2C"],
+      "hqCountry": "SG",
+      "region": "Asia",
+      "foundedYear": 2012,
+      "fundingStage": "Public",
+      "totalFundingUsd": 12600000000,
+      "headcount": 11000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "razorpay.com",
+      "date": "2026-01-24",
+      "domain": "razorpay.com",
+      "name": "Razorpay",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=razorpay.com&sz=128",
+      "sectors": ["Fintech", "Payments"],
+      "businessModel": ["B2B"],
+      "hqCountry": "IN",
+      "region": "Asia",
+      "foundedYear": 2014,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 740000000,
+      "headcount": 3000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "flutterwave.com",
+      "date": "2026-01-25",
+      "domain": "flutterwave.com",
+      "name": "Flutterwave",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=flutterwave.com&sz=128",
+      "sectors": ["Fintech", "Payments"],
+      "businessModel": ["B2B"],
+      "hqCountry": "NG",
+      "region": "Africa",
+      "foundedYear": 2016,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 470000000,
+      "headcount": 900,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "wiz.io",
+      "date": "2026-01-26",
+      "domain": "wiz.io",
+      "name": "Wiz",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=wiz.io&sz=128",
+      "sectors": ["Cybersecurity"],
+      "businessModel": ["B2B"],
+      "hqCountry": "IL",
+      "region": "Middle East",
+      "foundedYear": 2020,
+      "fundingStage": "Acquired",
+      "totalFundingUsd": 1900000000,
+      "headcount": 1800,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "gitlab.com",
+      "date": "2026-01-27",
+      "domain": "gitlab.com",
+      "name": "GitLab",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=gitlab.com&sz=128",
+      "sectors": ["Developer Tools", "SaaS Infrastructure"],
+      "businessModel": ["B2B"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2014,
+      "fundingStage": "Public",
+      "totalFundingUsd": 434000000,
+      "headcount": 2100,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "notion.so",
+      "date": "2026-01-28",
+      "domain": "notion.so",
+      "name": "Notion",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=notion.so&sz=128",
+      "sectors": ["Enterprise Software"],
+      "businessModel": ["B2B", "B2C"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2013,
+      "fundingStage": "Series D+",
+      "totalFundingUsd": 343000000,
+      "headcount": 800,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "duolingo.com",
+      "date": "2026-01-29",
+      "domain": "duolingo.com",
+      "name": "Duolingo",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=duolingo.com&sz=128",
+      "sectors": ["Edtech", "Consumer"],
+      "businessModel": ["B2C"],
+      "hqCountry": "US",
+      "region": "North America",
+      "foundedYear": 2011,
+      "fundingStage": "Public",
+      "totalFundingUsd": 183000000,
+      "headcount": 900,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    },
+    {
+      "id": "zalando.de",
+      "date": "2026-01-30",
+      "domain": "zalando.de",
+      "name": "Zalando",
+      "logoUrl": "https://www.google.com/s2/favicons?domain=zalando.de&sz=128",
+      "sectors": ["E-commerce", "Marketplace"],
+      "businessModel": ["B2C", "Marketplace"],
+      "hqCountry": "DE",
+      "region": "Europe",
+      "foundedYear": 2008,
+      "fundingStage": "Public",
+      "totalFundingUsd": 700000000,
+      "headcount": 15000,
+      "source": {
+        "notes": "Approximate, hand-written example data — not a Harmonic extraction."
+      }
+    }
+  ]
+}
