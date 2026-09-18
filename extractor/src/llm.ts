@@ -22,7 +22,7 @@ export type Provider = (typeof PROVIDERS)[number];
 export const DEFAULT_MODELS: Record<Provider, string> = {
   anthropic: "claude-opus-5",
   openai: "gpt-5",
-  gemini: "gemini-2.5-pro",
+  gemini: "gemini-3.1-pro",
 };
 
 /** `GEMINI_API_KEY` wins over LangChain's own `GOOGLE_API_KEY`, but both work. */
@@ -100,7 +100,7 @@ const RequestSchema = z.object({
 export const SYSTEM_PROMPT = [
   "You normalise startup data for a guessing game. Given evidence about one company, return the fields in the schema.",
   "Rules:",
-  "- Pick 1–3 sectors from the allowed list, most specific/primary first.",
+  "- Pick 1-3 sectors from the allowed list, most specific/primary first.",
   "- Never invent numbers.",
   "- Map the HQ country name to its ISO-3166-1 alpha-2 code, uppercase.",
   "- Map the funding stage: PRE_SEED→Pre-seed; SEED→Seed; SERIES_A/B/C→Series A/B/C;",
@@ -123,11 +123,6 @@ export interface LlmClient {
   /** `${provider}/${model}`, stored in `source.llm` */
   readonly label: string;
   extract(evidence: Evidence): Promise<Extraction>;
-}
-
-/** Just enough of LangChain's runnable to invoke it; the result is re-validated anyway. */
-interface StructuredRunnable {
-  invoke(input: unknown): Promise<unknown>;
 }
 
 async function createChatModel(
@@ -164,30 +159,24 @@ function isAuthError(err: unknown): boolean {
   );
 }
 
-export function createLlmClient(options: {
+export async function createLlmClient(options: {
   provider: Provider;
   model?: string;
   apiKey?: string;
-}): LlmClient {
+}): Promise<LlmClient> {
   const provider = options.provider;
   const model = options.model ?? DEFAULT_MODELS[provider];
-  const apiKey = options.apiKey;
-  if (!apiKey) throw new Error(`no API key for provider "${provider}"`);
+  if (!options.apiKey) throw new Error(`no API key for provider "${provider}"`);
 
-  let structured: Promise<StructuredRunnable> | undefined;
-  function chain(): Promise<StructuredRunnable> {
-    structured ??= createChatModel(provider, model, apiKey!).then((m) =>
-      m.withStructuredOutput(RequestSchema, { name: "extraction" }),
-    );
-    return structured;
-  }
+  const chat = await createChatModel(provider, model, options.apiKey);
+  const structured = chat.withStructuredOutput(RequestSchema, {
+    name: "extraction",
+  });
 
   async function ask(prompt: string): Promise<Extraction> {
     let raw: unknown;
     try {
-      raw = await (
-        await chain()
-      ).invoke([
+      raw = await structured.invoke([
         ["system", SYSTEM_PROMPT],
         ["human", prompt],
       ]);

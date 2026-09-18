@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_MODELS,
   ExtractionSchema,
+  PROVIDERS,
   apiKeyFor,
   createLlmClient,
   inferProvider,
@@ -36,19 +38,30 @@ describe("inferProvider", () => {
   });
 });
 
+/**
+ * These really do construct the provider's chat model (no network — constructors do not call out),
+ * so they also check that our options are the names the SDKs expect.
+ */
 describe("createLlmClient", () => {
-  it("labels itself provider/model, which is what lands in source.llm", () => {
-    expect(createLlmClient({ provider: "anthropic", apiKey: "k" }).label).toBe(
-      "anthropic/claude-opus-5",
-    );
-    expect(
-      createLlmClient({ provider: "openai", model: "gpt-4.1", apiKey: "k" })
-        .label,
-    ).toBe("openai/gpt-4.1");
+  it("defaults to the provider's model and labels itself provider/model", async () => {
+    // Against DEFAULT_MODELS, not a literal: those ids go stale and get bumped.
+    for (const provider of PROVIDERS) {
+      const client = await createLlmClient({ provider, apiKey: "k" });
+      expect(client.label).toBe(`${provider}/${DEFAULT_MODELS[provider]}`);
+    }
   });
 
-  it("refuses to build without a key", () => {
-    expect(() => createLlmClient({ provider: "anthropic" })).toThrow(
+  it("lets --model override the default", async () => {
+    const openai = await createLlmClient({
+      provider: "openai",
+      model: "gpt-4.1",
+      apiKey: "k",
+    });
+    expect(openai.label).toBe("openai/gpt-4.1");
+  });
+
+  it("refuses to build without a key", async () => {
+    await expect(createLlmClient({ provider: "anthropic" })).rejects.toThrow(
       /no API key/,
     );
   });

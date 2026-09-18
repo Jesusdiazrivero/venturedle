@@ -33,7 +33,7 @@ function resolveProvider(requested: string | undefined): Provider {
   return requested as Provider;
 }
 
-function createClients(flags: Flags): Clients {
+async function createClients(flags: Flags): Promise<Clients> {
   const provider = resolveProvider(flags.provider);
 
   const apiKey = process.env.HARMONIC_API_KEY?.trim();
@@ -42,7 +42,7 @@ function createClients(flags: Flags): Clients {
 
   return {
     harmonic: createHarmonicClient({ apiKey, ...(baseUrl ? { baseUrl } : {}) }),
-    llm: createLlmClient({
+    llm: await createLlmClient({
       provider,
       ...(flags.model ? { model: flags.model } : {}),
       apiKey: apiKeyFor(provider, process.env),
@@ -62,12 +62,12 @@ program
   .option("-o, --out <file>", "output file", "data/companies.json")
   .option("--provider <name>", PROVIDERS.join(" | "))
   .option("--model <id>", "override the provider's default model")
-  .action((flags: Flags) => {
+  .action(async (flags: Flags) => {
     if (!flags.domains) throw new Error("--domains is required");
     if (!flags.start) throw new Error("--start is required");
-    return extract(
+    await extract(
       { domains: flags.domains, start: flags.start, out: flags.out },
-      createClients(flags),
+      await createClients(flags),
     );
   });
 
