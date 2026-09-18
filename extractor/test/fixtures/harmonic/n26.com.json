@@ -1,0 +1,20 @@
+{
+  "_fixture": "unverified",
+  "id": 77410,
+  "name": "N26",
+  "description": "N26 is a mobile bank offering current accounts, cards and savings products across Europe.",
+  "website": { "domain": "n26.com" },
+  "headcount": 1500,
+  "funding": {
+    "funding_total": 1780000000,
+    "funding_stage": "SERIES_D",
+    "funding_rounds": [{ "funding_round_type": "SERIES_D" }]
+  },
+  "founding_date": { "date": "2013-02-01" },
+  "location": { "country": "Germany", "state": "Berlin", "city": "Berlin" },
+  "tags_v2": [
+    { "type": "INDUSTRY", "display_value": "Fintech" },
+    { "type": "PRODUCT", "display_value": "Payments" }
+  ],
+  "customer_type": "B2C"
+}

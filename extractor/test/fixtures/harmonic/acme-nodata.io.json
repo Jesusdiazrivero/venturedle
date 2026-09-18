@@ -1,0 +1,20 @@
+{
+  "_fixture": "unverified",
+  "id": 999001,
+  "name": "Acme Nodata",
+  "description": "A company Harmonic knows about but has no headcount for.",
+  "website": { "domain": "acme-nodata.io" },
+  "funding": {
+    "funding_total": 12000000,
+    "funding_stage": "SERIES_A",
+    "funding_rounds": [{ "funding_round_type": "SERIES_A" }]
+  },
+  "founding_date": { "date": "2019-03-01" },
+  "location": {
+    "country": "United States",
+    "state": "New York",
+    "city": "New York"
+  },
+  "tags_v2": ["Enterprise Software"],
+  "customer_type": "B2B"
+}

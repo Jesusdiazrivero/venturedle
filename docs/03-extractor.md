@@ -26,7 +26,8 @@ npm run extract -- -d data/domains.txt -s 2026-10-01 -o data/companies.json
 npm run extract -- validate data/companies.json      # zod-validate an existing file, exit 1 on failure
 ```
 
-Environment (a root `.env` is loaded with `dotenv`; `.env.example` documents these):
+Environment (a root `.env` is loaded by `tsx --env-file-if-exists=../.env`, so there is no
+`dotenv` dependency; `.env.example` documents these):
 
 ```
 HARMONIC_API_KEY=...          # required for extract (unless --provider mock)
@@ -34,6 +35,7 @@ ANTHROPIC_API_KEY=...         # exactly one of these three is needed
 OPENAI_API_KEY=...
 GEMINI_API_KEY=...            # (LangChain's own name is GOOGLE_API_KEY; accept both and pass the key explicitly to the provider factory)
 HARMONIC_BASE_URL=            # optional; default https://api.harmonic.ai — tests point it at a fixture server
+                              # setting it also makes `--provider mock` use the real HTTP client (see below)
 ```
 
 All file paths given on the command line or in env are resolved against the **repo root**
@@ -211,6 +213,11 @@ deterministic fake company derived from a hash of the domain (name = capitalised
 plausible numbers, a fixed country/stage rotation) and `llm.ts` returns a matching extraction. It
 exists so tests, demos and the "production-like local run" in `06-deployment.md` need no keys.
 
+One exception, and it is the seam the tests use: if `HARMONIC_BASE_URL` is set explicitly,
+`--provider mock` still uses the real Harmonic client against that URL, so `cli.e2e.test.ts` can
+run the whole pipeline against a fixture server (404s, missing fields, retries) with a mock LLM. A
+normal run never sets that variable, so `--provider mock` stays offline and never spends a credit.
+
 Cache: `.cache/llm/{domain}.{sha256(prompt+schema+model).slice(0,12)}.json`. Changing the prompt,
 taxonomy or model invalidates it automatically.
 
@@ -265,19 +272,30 @@ Re-running with the same inputs is idempotent (cache) and deterministic except f
 
 ```
 extractor/
-  package.json            # scripts.extract = "tsx src/cli.ts"; deps: commander, zod, @langchain/core, @langchain/anthropic, @langchain/openai, @langchain/google-genai, dotenv, tsx
+  package.json            # scripts.extract = "tsx src/cli.ts"; deps: commander, zod, @langchain/core, @langchain/anthropic, @langchain/openai, @langchain/google-genai, tsx
   src/
     cli.ts                # arg parsing, orchestration, logging
     domains.ts            # read + normalise + dedupe domains file
-    harmonic.ts           # fetchCompany(domain): Promise<RawHarmonic | NotFound>, retries, cache
-    evidence.ts           # toEvidence(raw): Evidence   (tolerant field picking lives here)
-    llm.ts                # extract(evidence, provider): Promise<Extraction>, cache, mock provider
+    harmonic.ts           # fetchCompany(domain), retries, cache, mock client
+    evidence.ts           # toEvidence(raw): Evidence + toFacts(raw): HarmonicFacts (tolerant field picking)
+    llm.ts                # extract(evidence): Promise<Extraction>, cache, mock provider
+    record.ts             # buildRecord(): merge + CompanySchema, or a rejection reason
     schedule.ts           # assignDates(records, start)
     write.ts              # write companies.json + rejected.json
+    cache.ts              # the disk cache both harmonic.ts and llm.ts use
+    models.ts             # default model per provider + provider inference from the env
+    countries.ts          # country name → ISO-2, used only by the mock provider
+    paths.ts              # resolve CLI/env paths against the repo root (INIT_CWD)
+    types.ts              # RejectionReason, Rejection, AbortRunError
   test/
+    fixtures/domains.txt       # the 5-domain file the e2e test and the README use
     fixtures/harmonic/*.json   # 3–4 anonymised real responses (snake_case) — record on first run
+    fixture-server.ts          # http.createServer serving fixtures by website_domain
+    domains.test.ts
     evidence.test.ts
+    harmonic.test.ts
     llm.mock.test.ts
+    record.test.ts
     schedule.test.ts
     cli.e2e.test.ts       # runs the CLI with mock provider + fixture Harmonic server
 ```

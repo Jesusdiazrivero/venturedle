@@ -1,0 +1,26 @@
+{
+  "_fixture": "unverified",
+  "id": 102994,
+  "name": "Revolut",
+  "logo_url": "https://assets.harmonic.ai/company_logos/revolut.png",
+  "description": "Revolut is a financial super-app offering accounts, cards, currency exchange, trading and business banking.",
+  "website": { "domain": "revolut.com" },
+  "headcount": 9300,
+  "funding": {
+    "funding_total": 2170000000,
+    "funding_stage": "LATER_STAGE",
+    "funding_rounds": [
+      { "funding_round_type": "SERIES_B" },
+      { "funding_round_type": "SERIES_C" },
+      { "funding_round_type": "LATER_STAGE" }
+    ]
+  },
+  "founding_date": { "date": "2015-07-01" },
+  "location": {
+    "country": "United Kingdom",
+    "state": "England",
+    "city": "London"
+  },
+  "tags_v2": ["Fintech", "Payments"],
+  "customer_type": ["B2C", "B2B"]
+}

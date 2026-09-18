@@ -1,0 +1,27 @@
+{
+  "_fixture": "unverified",
+  "id": 481523,
+  "name": "Klarna",
+  "logo_url": "https://assets.harmonic.ai/company_logos/klarna.png",
+  "description": "Klarna offers a global payments and shopping network, including buy-now-pay-later checkout, a consumer app and merchant tooling.",
+  "website": { "domain": "klarna.com" },
+  "headcount": 4585,
+  "funding": {
+    "funding_total": 9460186174,
+    "funding_stage": "EXITED",
+    "funding_rounds": [
+      { "funding_round_type": "SERIES_A" },
+      { "funding_round_type": "SERIES_C" },
+      { "funding_round_type": "LATER_STAGE" },
+      { "funding_round_type": "IPO" }
+    ]
+  },
+  "founding_date": { "date": "2005-01-01" },
+  "location": {
+    "country": "Sweden",
+    "state": "Stockholm County",
+    "city": "Stockholm"
+  },
+  "tags_v2": ["Fintech", "Payments", "BNPL"],
+  "customer_type": "B2C"
+}

@@ -9,6 +9,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@venturedle/shared": "*"
+    "@langchain/anthropic": "^1.5.10",
+    "@langchain/core": "^1.2.11",
+    "@langchain/google-genai": "^2.3.2",
+    "@langchain/openai": "^1.5.13",
+    "@venturedle/shared": "*",
+    "commander": "^15.0.0",
+    "tsx": "^4.23.13",
+    "zod": "^3.25.76"
   }
 }

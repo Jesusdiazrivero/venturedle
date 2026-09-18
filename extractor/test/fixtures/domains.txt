@@ -1,0 +1,7 @@
+# Venturedle test schedule — deliberately messy input.
+klarna.com
+https://www.revolut.com/about
+
+stealthco.xyz        # the fixture server has no record for this one
+acme-nodata.io       # the fixture record has no headcount
+n26.com

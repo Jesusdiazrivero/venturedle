@@ -200,3 +200,23 @@ way, never scheduled) would fix both issues. Straightforward extension of the ex
 leaderboards. YAGNI.
 
 **Seam.** Leaderboard by date is trivial (`scope=date&date=`). Replay is not, and is not wanted.
+
+---
+
+### D12. The extractor's dependency list
+
+**Decision.** `extractor/` adds `commander`, `zod`, `tsx` and the four LangChain packages
+(`@langchain/core` + one per provider). It does **not** add `dotenv`: `tsx
+--env-file-if-exists=../.env` already loads the root `.env`, and Node reads it natively.
+
+**Why.** Invariant 9 asks for a reason per dependency. `commander` is the one that carries the
+help text, the `validate` subcommand and `--no-cache` for ~30 lines of code. `zod` is already the
+project's schema language (`shared/`), so the LLM's structured output is validated by the same
+library that validates the file it ends up in. LangChain is D3's provider seam. `tsx` is how every
+non-browser workspace runs (D1). `dotenv` would have been a dependency for a flag we already pass.
+
+**Rejected.** Hand-rolled arg parsing (it grows into a worse commander); the provider SDKs directly
+(three structured-output implementations instead of one — see D3); `.env` parsing of our own.
+
+**Seam.** `cli.ts` is the only file that imports `commander`, and `llm.ts` the only one that
+imports LangChain — both replaceable in one file.
