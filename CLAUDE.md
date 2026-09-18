@@ -83,8 +83,8 @@ args resolve against the repo root (`INIT_CWD`), whatever workspace the script r
 - Env surface is deliberately tiny (`docs/04-backend.md` has the whole table). Adding a variable
   needs a reason in `07-decisions.md`, same as a dependency.
 - SQL lives in `backend/src/db/schema.sql` and in the query helpers; plain SQLite, WAL mode, no ORM.
-- Tests never hit the network: Harmonic is a fixture server, the LLM is the `mock` provider,
-  Google token verification is injected.
+- Tests never hit the network, and the fakes live in `test/`, never in `src/`: Harmonic is a
+  fixture server, the LLM and Google token verification are injected.
 - Logs are one line per event, to stdout. No log framework.
 - Env vars are documented in `.env.example` the moment they are introduced.
 
@@ -99,9 +99,38 @@ args resolve against the repo root (`INIT_CWD`), whatever workspace the script r
 - Why it is like this: `docs/07-decisions.md`
 - What to build next: `docs/08-build-plan.md`
 
+## Simplicity — apply these before showing me the code
+
+These were all learned the hard way on Phase 2 (`docs/07-decisions.md` D13, D14 are the concrete
+instances). They are not style preferences; a change that breaks one is wrong and gets sent back.
+
+1. **Few files, boringly named.** The extractor is five. A new file needs a reason, the same as a
+   dependency does; one `tools.ts` holding the pure helpers beats eight one-function modules.
+   `backend/` will be bigger than five — that is a reason to argue each file, not a licence.
+2. **No fakes in `src/`.** No mock provider, no in-memory driver, no `if (testMode)`. Inject at a
+   seam and put the double in `test/`. A fake that ships is dead weight in the binary and a second
+   implementation of a rule that will drift from the real one.
+3. **No optional parameter that exists for tests.** If a test needs to pass something in, that
+   argument is required for everyone. `f(opts, deps?)` means the caller must reason about which
+   branch ran.
+4. **One layer, one job, once.** The composition root (`cli.ts`, `server.ts`) owns flags, env and
+   validation; the code it calls owns the work. Do not re-validate defensively one layer down.
+5. **Build expensive things once, where the thing is built.** If a constructor needs `await`, make
+   the factory `async` — do not paper over it with lazy memoisation, `??=` or a `let` that starts
+   `undefined`.
+6. **Name things for behaviour, not mechanism.** `mapConcurrent`, not `mapPool`. If the name needs
+   the implementation to make sense, it is the wrong name.
+7. **Every flag, table and env var earns its place.** A flag a path argument already covers, a
+   lookup table only a fake reads, a knob nobody tunes: delete it. The small surface is the feature.
+8. **Do not build for a workflow that is not the job.** The extractor runs a handful of times, so
+   it has no cache. Optimise the path that is actually taken.
+9. **Prefer deleting to abstracting.** A helper for one call site needs to be genuinely subtle to
+   survive.
+10. **When simplicity and `docs/` disagree, simplify and write the decision down** in
+    `docs/07-decisions.md`, then fix the doc in the same commit. Never silently diverge.
+
 ## Working style for this repo
 
 Work phase by phase through `docs/08-build-plan.md`; each phase ends with its acceptance checks
-passing and a commit. Prefer deleting to abstracting. If a piece of v1 (`../venturedle`, if
-present) is a useful porting reference the docs say so — otherwise do not look at v1; v2 is
-deliberately not a refactor of it.
+passing and a commit. If a piece of v1 (`../venturedle`, if present) is a useful porting reference
+the docs say so — otherwise do not look at v1; v2 is deliberately not a refactor of it.
