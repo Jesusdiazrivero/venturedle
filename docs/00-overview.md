@@ -50,8 +50,8 @@ has no runtime of its own. See `02-data-contract.md`.
   file it owns. No Firestore, no Cloud SQL, no message queues, no cron in prod.
 - Zero-config local run: `npm install && npm run dev` starts the backend + frontend against the
   shipped `data/companies.example.json` in anonymous-nickname mode. No API keys needed to play.
-  The extractor's `--provider mock` mode is fully offline too, so even a production-like Docker run
-  needs no keys.
+  `npm run example-schedule` re-dates that example file to start today, so even a production-like
+  Docker run needs no keys.
 - Keys are only needed to _generate a new company list_ (extractor) or to _turn on Google sign-in_
   (backend). Both are opt-in.
 - Deployment is `docker compose up -d` on any Linux box. GCP is the documented first target

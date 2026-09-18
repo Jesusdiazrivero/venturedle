@@ -32,11 +32,10 @@ npm run typecheck                             # tsc --noEmit per workspace; no c
 npm run build                                 # typecheck + vite build (frontend/dist). Backend runs via tsx, dev and prod.
 
 npm run extract -- -d data/domains.txt -s 2026-10-01          # needs HARMONIC_API_KEY + one LLM key in .env
-npm run extract -- --provider mock -d extractor/test/fixtures/domains.txt -s 2026-10-01 -o /tmp/x.json
 npm run extract -- validate data/companies.json
 
 npm test -w backend -- results                # one test file by name
-npm run extract -- --provider mock -d extractor/test/fixtures/domains.txt -s "$(date -u +%F)"   # keyless schedule starting today
+npm run example-schedule                      # keyless schedule starting today, from companies.example.json
 cd deploy && DOMAIN=:80 docker compose up -d --build           # production-like local run on :80 (needs deploy/.env)
 ```
 

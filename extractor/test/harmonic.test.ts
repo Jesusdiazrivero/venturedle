@@ -1,10 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import {
-  createHarmonicClient,
-  createMockHarmonicClient,
-  toEvidence,
-  toFacts,
-} from "../src/harmonic.js";
+import { createHarmonicClient, toEvidence, toFacts } from "../src/harmonic.js";
 import { AbortRunError } from "../src/tools.js";
 import { startFixtureServer, type FixtureServer } from "./fixture-server.js";
 
@@ -257,27 +252,5 @@ describe("toFacts", () => {
     expect(facts.headcount).toBeNull();
     expect(facts.totalFundingUsd).toBeNull();
     expect(facts.foundedYear).toBeNull();
-  });
-});
-
-describe("the mock client", () => {
-  it("invents a complete, deterministic company without any network", async () => {
-    const mock = createMockHarmonicClient();
-    const first = await mock.fetchCompany("example.com");
-    expect(first).toEqual(await mock.fetchCompany("example.com"));
-    expect(first.ok).toBe(true);
-    if (!first.ok) return;
-    const facts = toFacts("example.com", first.body);
-    expect(facts.name).toBe("Example");
-    expect(facts.headcount).toBeGreaterThan(0);
-    expect(facts.totalFundingUsd).toBeGreaterThan(0);
-    expect(server.requests).toEqual([]);
-  });
-
-  it("gives different domains different companies", async () => {
-    const mock = createMockHarmonicClient();
-    expect(await mock.fetchCompany("alpha.com")).not.toEqual(
-      await mock.fetchCompany("beta.io"),
-    );
   });
 });

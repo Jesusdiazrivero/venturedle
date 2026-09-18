@@ -20,6 +20,7 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "extract": "npm run extract -w extractor --",
+    "example-schedule": "npm run example-schedule -w extractor --",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

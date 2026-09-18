@@ -13,29 +13,27 @@ import {
 } from "@venturedle/shared/server";
 import { z } from "zod";
 import type { Evidence } from "./harmonic.js";
-import { AbortRunError, hashDomain } from "./tools.js";
+import { AbortRunError } from "./tools.js";
 
-export const PROVIDERS = ["anthropic", "openai", "gemini", "mock"] as const;
+export const PROVIDERS = ["anthropic", "openai", "gemini"] as const;
 export type Provider = (typeof PROVIDERS)[number];
-export type KeyedProvider = Exclude<Provider, "mock">;
 
 /** These go stale. Check the provider's docs and use `--model` rather than editing for one run. */
 export const DEFAULT_MODELS: Record<Provider, string> = {
   anthropic: "claude-opus-5",
   openai: "gpt-5",
   gemini: "gemini-2.5-pro",
-  mock: "mock",
 };
 
 /** `GEMINI_API_KEY` wins over LangChain's own `GOOGLE_API_KEY`, but both work. */
-const API_KEY_ENV: Record<KeyedProvider, readonly string[]> = {
+const API_KEY_ENV: Record<Provider, readonly string[]> = {
   anthropic: ["ANTHROPIC_API_KEY"],
   openai: ["OPENAI_API_KEY"],
   gemini: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
 };
 
 export function apiKeyFor(
-  provider: KeyedProvider,
+  provider: Provider,
   env: NodeJS.ProcessEnv,
 ): string | undefined {
   for (const name of API_KEY_ENV[provider]) {
@@ -49,7 +47,7 @@ export function apiKeyFor(
  * With no `--provider`, exactly one key must be set: zero is "nothing to run with", more than one
  * is a coin toss the operator should not have to guess the outcome of.
  */
-export function inferProvider(env: NodeJS.ProcessEnv): KeyedProvider {
+export function inferProvider(env: NodeJS.ProcessEnv): Provider {
   const set = (["anthropic", "openai", "gemini"] as const).filter((p) =>
     apiKeyFor(p, env),
   );
@@ -133,11 +131,11 @@ interface StructuredRunnable {
 }
 
 async function createChatModel(
-  provider: KeyedProvider,
+  provider: Provider,
   model: string,
   apiKey: string,
 ): Promise<BaseChatModel> {
-  // Imported lazily so an offline `--provider mock` run never loads a provider SDK.
+  // Imported lazily so a run only loads the SDK of the provider it actually uses.
   switch (provider) {
     case "anthropic": {
       const { ChatAnthropic } = await import("@langchain/anthropic");
@@ -171,8 +169,6 @@ export function createLlmClient(options: {
   model?: string;
   apiKey?: string;
 }): LlmClient {
-  if (options.provider === "mock") return createMockLlmClient();
-
   const provider = options.provider;
   const model = options.model ?? DEFAULT_MODELS[provider];
   const apiKey = options.apiKey;
@@ -233,101 +229,6 @@ export function createLlmClient(options: {
           `${prompt}\n\nYour previous answer was rejected: ${err.message}\nReturn a corrected object.`,
         );
       }
-    },
-  };
-}
-
-// --- the offline mock ----------------------------------------------------------------------
-
-/** Only the mock needs this: the real providers map country names themselves. */
-const MOCK_COUNTRY_CODES: Readonly<Record<string, string>> = {
-  brazil: "BR",
-  germany: "DE",
-  singapore: "SG",
-  spain: "ES",
-  sweden: "SE",
-  "united kingdom": "GB",
-  "united states": "US",
-};
-
-/**
- * The documented stage mapping, applied deterministically. The real providers are asked to do this
- * in the prompt; the mock does it in code so offline runs produce sensible, stable records.
- */
-export function mapFundingStage(
-  evidence: Evidence,
-): (typeof FUNDING_STAGES)[number] {
-  const raw = (evidence.funding.stageRaw ?? "").toUpperCase();
-  const wentPublic = evidence.funding.roundTypes
-    .map((r) => r.toUpperCase())
-    .some((r) => r === "IPO" || r === "PUBLIC_EQUITY_OFFERING");
-  switch (raw) {
-    case "PRE_SEED":
-      return "Pre-seed";
-    case "SEED":
-      return "Seed";
-    case "SERIES_A":
-      return "Series A";
-    case "SERIES_B":
-      return "Series B";
-    case "SERIES_C":
-      return "Series C";
-    case "EXITED":
-      return wentPublic ? "Public" : "Acquired";
-    case "":
-      break;
-    default:
-      return "Series D+"; // SERIES_D and later, LATER_STAGE, PRIVATE_EQUITY
-  }
-  const total = evidence.funding.totalUsd ?? 0;
-  if (total >= 100_000_000) return "Series D+";
-  if (total >= 25_000_000) return "Series C";
-  if (total >= 5_000_000) return "Series A";
-  return "Seed";
-}
-
-/** Offline and deterministic: the same evidence always yields the same extraction. */
-export function createMockLlmClient(): LlmClient {
-  return {
-    label: "mock/mock",
-    async extract(evidence) {
-      const h = hashDomain(evidence.domain);
-      const sectors = [
-        ...new Set(
-          evidence.tags.filter((tag): tag is (typeof SECTORS)[number] =>
-            (SECTORS as readonly string[]).includes(tag),
-          ),
-        ),
-      ].slice(0, 3);
-      const models = [
-        ...new Set(
-          (evidence.customerType ?? "")
-            .split(/[,/]/)
-            .map((v) => v.trim().toUpperCase())
-            .filter((v): v is (typeof BUSINESS_MODELS)[number] =>
-              (BUSINESS_MODELS as readonly string[]).includes(v),
-            ),
-        ),
-      ];
-      const country = evidence.location.country?.trim().toLowerCase() ?? "";
-      return {
-        sectors: sectors.length ? sectors : [SECTORS[h % SECTORS.length]!],
-        businessModel: models.length
-          ? models
-          : [BUSINESS_MODELS[h % BUSINESS_MODELS.length]!],
-        hqCountry:
-          MOCK_COUNTRY_CODES[country] ??
-          Object.values(MOCK_COUNTRY_CODES)[
-            h % Object.keys(MOCK_COUNTRY_CODES).length
-          ]!,
-        foundedYear: evidence.foundingDate
-          ? Number(evidence.foundingDate.slice(0, 4))
-          : 2015,
-        fundingStage: mapFundingStage(evidence),
-        confidence: "high",
-        notes:
-          "mock provider — categories derived deterministically from the evidence, not a model",
-      };
     },
   };
 }

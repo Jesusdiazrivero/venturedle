@@ -1,5 +1,5 @@
 /**
- * Everything Harmonic-shaped: the HTTP call, the offline mock, and the mapping from a raw response
+ * Everything Harmonic-shaped: the HTTP call and the mapping from a raw response
  * to the two things the pipeline needs — the numbers we copy verbatim (`HarmonicFacts`) and the
  * compact, LLM-facing `Evidence`.
  *
@@ -7,7 +7,7 @@
  * MCP layer returns camelCase, so every accessor accepts both. `docs/03-extractor.md` has the
  * table of intents; this file is its implementation.
  */
-import { AbortRunError, hashDomain, type RejectionReason } from "./tools.js";
+import { AbortRunError, type RejectionReason } from "./tools.js";
 
 export const DEFAULT_BASE_URL = "https://api.harmonic.ai";
 
@@ -292,78 +292,5 @@ export function toFacts(domain: string, raw: unknown): HarmonicFacts {
       "funding.fundingTotal",
     ]),
     foundedYear: foundingDate ? Number(foundingDate.slice(0, 4)) : null,
-  };
-}
-
-// --- the offline mock ----------------------------------------------------------------------
-
-const MOCK_PLACES = [
-  { country: "Sweden", state: "Stockholm County", city: "Stockholm" },
-  { country: "United States", state: "California", city: "San Francisco" },
-  { country: "Germany", state: "Berlin", city: "Berlin" },
-  { country: "Spain", state: "Madrid", city: "Madrid" },
-  { country: "United Kingdom", state: "England", city: "London" },
-  { country: "Singapore", state: "Singapore", city: "Singapore" },
-  { country: "Brazil", state: "São Paulo", city: "São Paulo" },
-];
-const MOCK_STAGES = [
-  "SEED",
-  "SERIES_A",
-  "SERIES_B",
-  "SERIES_C",
-  "SERIES_D",
-  "LATER_STAGE",
-  "EXITED",
-];
-const MOCK_HEADCOUNTS = [7, 30, 120, 350, 800, 2_500, 9_000];
-const MOCK_FUNDING = [
-  500_000, 3_000_000, 12_000_000, 60_000_000, 250_000_000, 750_000_000,
-  2_500_000_000,
-];
-// Values from the shared taxonomy, so a mock schedule reads like a real one.
-const MOCK_TAGS = [
-  ["Fintech", "Payments"],
-  ["AI / ML", "Developer Tools"],
-  ["Marketplace", "E-commerce"],
-  ["Healthtech", "SaaS Infrastructure"],
-  ["Climate & Energy"],
-  ["Logistics & Supply Chain"],
-  ["Cybersecurity", "Enterprise Software"],
-];
-
-/**
- * `--provider mock` with no `HARMONIC_BASE_URL`: a plausible company invented from the domain, in
- * the same snake_case shape as the real API, so the rest of the pipeline is exercised unchanged.
- */
-export function createMockHarmonicClient(): HarmonicClient {
-  return {
-    async fetchCompany(domain) {
-      const h = hashDomain(domain);
-      const label = domain.split(".")[0]!;
-      const name = label.charAt(0).toUpperCase() + label.slice(1);
-      const stage = MOCK_STAGES[h % MOCK_STAGES.length]!;
-      return {
-        ok: true,
-        fetchedAt: "1970-01-01T00:00:00.000Z", // fixed: mock runs must be byte-identical
-        body: {
-          id: 100_000 + (h % 900_000),
-          name,
-          logo_url: null, // exercises the favicon fallback
-          description: `${name} is a mock company generated from the domain ${domain} for offline runs.`,
-          website: { domain },
-          headcount: MOCK_HEADCOUNTS[h % MOCK_HEADCOUNTS.length]!,
-          funding: {
-            funding_total: MOCK_FUNDING[h % MOCK_FUNDING.length]!,
-            funding_stage: stage,
-            funding_rounds:
-              stage === "EXITED" ? [{ funding_round_type: "IPO" }] : [],
-          },
-          founding_date: { date: `${1995 + (h % 30)}-06-01` },
-          location: MOCK_PLACES[h % MOCK_PLACES.length]!,
-          tags_v2: MOCK_TAGS[h % MOCK_TAGS.length]!,
-          customer_type: h % 2 === 0 ? "B2B" : "B2C",
-        },
-      };
-    },
   };
 }

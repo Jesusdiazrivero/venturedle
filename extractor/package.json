@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "extract": "tsx --env-file-if-exists=../.env src/cli.ts",
+    "example-schedule": "tsx scripts/example-schedule.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

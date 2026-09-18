@@ -243,16 +243,6 @@ export async function mapPool<T, R>(
   return results;
 }
 
-/** FNV-1a. Any stable hash would do; this one is four lines and needs no dependency. */
-export function hashDomain(domain: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < domain.length; i++) {
-    h ^= domain.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h;
-}
-
 // --- output --------------------------------------------------------------------------------
 
 async function writeJson(file: string, value: unknown): Promise<void> {

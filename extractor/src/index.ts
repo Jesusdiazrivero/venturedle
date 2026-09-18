@@ -14,13 +14,11 @@ import {
 } from "@venturedle/shared/server";
 import {
   createHarmonicClient,
-  createMockHarmonicClient,
   toEvidence,
   toFacts,
   type HarmonicClient,
 } from "./harmonic.js";
 import {
-  DEFAULT_MODELS,
   LlmInvalidOutputError,
   PROVIDERS,
   apiKeyFor,
@@ -70,19 +68,30 @@ function resolveProvider(requested: string | undefined): Provider {
   return requested as Provider;
 }
 
-function createHarmonic(provider: Provider): HarmonicClient {
-  // `--provider mock` is offline, Harmonic included — unless HARMONIC_BASE_URL points somewhere
-  // explicitly, which is the seam the tests use for their fixture server.
-  const baseUrl = process.env.HARMONIC_BASE_URL?.trim();
-  if (provider === "mock" && !baseUrl) return createMockHarmonicClient();
+/**
+ * The two external edges, built from the environment. Tests pass their own doubles to `extract`
+ * instead of going through here — there is no fake provider in the shipped code.
+ */
+export interface Clients {
+  harmonic: HarmonicClient;
+  llm: LlmClient;
+}
+
+function createClients(options: ExtractOptions): Clients {
+  const provider = resolveProvider(options.provider);
 
   const apiKey = process.env.HARMONIC_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error(
-      "HARMONIC_API_KEY is not set (or use --provider mock for an offline run)",
-    );
-  }
-  return createHarmonicClient({ apiKey, ...(baseUrl ? { baseUrl } : {}) });
+  if (!apiKey) throw new Error("HARMONIC_API_KEY is not set");
+  const baseUrl = process.env.HARMONIC_BASE_URL?.trim();
+
+  return {
+    harmonic: createHarmonicClient({ apiKey, ...(baseUrl ? { baseUrl } : {}) }),
+    llm: createLlmClient({
+      provider,
+      ...(options.model ? { model: options.model } : {}),
+      apiKey: apiKeyFor(provider, process.env),
+    }),
+  };
 }
 
 async function processDomain(
@@ -139,27 +148,20 @@ function describe(record: UndatedCompany): string {
   ].join(" · ");
 }
 
-export async function extract(options: ExtractOptions): Promise<void> {
+export async function extract(
+  options: ExtractOptions,
+  clients?: Clients,
+): Promise<void> {
   if (!options.domains) throw new Error("--domains is required");
   if (!options.start) throw new Error("--start is required");
   const start = options.start;
 
   const outFile = resolveFromRoot(options.out);
   const domains = await readDomainsFile(resolveFromRoot(options.domains));
+  const { harmonic, llm } = clients ?? createClients(options);
 
-  const provider = resolveProvider(options.provider);
-  const harmonic = createHarmonic(provider);
-  const llm = createLlmClient({
-    provider,
-    ...(options.model ? { model: options.model } : {}),
-    ...(provider === "mock"
-      ? {}
-      : { apiKey: apiKeyFor(provider, process.env) }),
-  });
-
-  const model = options.model ?? DEFAULT_MODELS[provider];
   console.log(
-    `Extracting ${domains.length} domains with ${provider}/${model}, starting ${start}`,
+    `Extracting ${domains.length} domains with ${llm.label}, starting ${start}`,
   );
 
   const outcomes = await mapPool(domains, CONCURRENCY, (domain) =>

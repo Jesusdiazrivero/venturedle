@@ -15,9 +15,7 @@ npm run extract -- -d data/domains.txt -s 2026-10-01 -o data/companies.json
 #   -d, --domains <file>     required. One domain per line. Blank lines and lines starting with # are ignored.
 #   -s, --start <date>       required. YYYY-MM-DD (UTC). First valid company gets this date.
 #   -o, --out <file>         default data/companies.json
-#   --provider <name>        anthropic | openai | gemini | mock. Default: inferred from which *_API_KEY is set.
-#                            mock = NO network at all: Harmonic is faked too (deterministic records from the domain string).
-#                            Use it for tests, demos and to produce a schedule that starts today without any keys.
+#   --provider <name>        anthropic | openai | gemini. Default: inferred from which *_API_KEY is set.
 #   --model <id>             override the provider's default model
 #                            (concurrency is fixed at 3; there are no other flags — see D13)
 
@@ -28,12 +26,11 @@ Environment (a root `.env` is loaded by `tsx --env-file-if-exists=../.env`, so t
 `dotenv` dependency; `.env.example` documents these):
 
 ```
-HARMONIC_API_KEY=...          # required for extract (unless --provider mock)
+HARMONIC_API_KEY=...          # required for extract; there is no offline mode (D14)
 ANTHROPIC_API_KEY=...         # exactly one of these three is needed
 OPENAI_API_KEY=...
 GEMINI_API_KEY=...            # (LangChain's own name is GOOGLE_API_KEY; accept both and pass the key explicitly to the provider factory)
 HARMONIC_BASE_URL=            # optional; default https://api.harmonic.ai — tests point it at a fixture server
-                              # setting it also makes `--provider mock` use the real HTTP client (see below)
 ```
 
 All file paths given on the command line or in env are resolved against the **repo root**
@@ -199,18 +196,13 @@ the result with the strict zod schema afterwards — `withStructuredOutput` uses
 modes that differ slightly per provider in which schema keywords they accept. No chains, prompt
 templates, agents or LangSmith in v2: the library is used only for the provider abstraction and
 structured output. Default models (override with `--model`): put them in one constant
-(`extractor/src/models.ts`) with today's sensible defaults per provider and note in the README that
-they go stale. Temperature 0.
+(`DEFAULT_MODELS` in `llm.ts`) with today's sensible defaults per provider and note in the README
+that they go stale. Temperature 0.
 
-The `mock` provider (selected with `--provider mock`) is fully offline: `harmonic.ts` returns a
-deterministic fake company derived from a hash of the domain (name = capitalised domain label,
-plausible numbers, a fixed country/stage rotation) and `llm.ts` returns a matching extraction. It
-exists so tests, demos and the "production-like local run" in `06-deployment.md` need no keys.
-
-One exception, and it is the seam the tests use: if `HARMONIC_BASE_URL` is set explicitly,
-`--provider mock` still uses the real Harmonic client against that URL, so `cli.e2e.test.ts` can
-run the whole pipeline against a fixture server (404s, missing fields, retries) with a mock LLM. A
-normal run never sets that variable, so `--provider mock` stays offline and never spends a credit.
+**There is no offline or mock provider** (D14). Running the extractor always costs one Harmonic
+credit and one model call per domain. The keyless path is `npm run example-schedule`, which
+re-dates the committed `data/companies.example.json` to start today — enough to play and to bring
+up the production-like Docker run, but it is not a schedule built from *your* domains.
 
 Retries: one retry on schema-validation failure with the validation error appended to the prompt;
 then `llm_invalid_output`.
@@ -266,24 +258,29 @@ domain is fetched and extracted again.
 ```
 extractor/
   package.json            # scripts.extract = "tsx src/cli.ts"; deps: commander, zod, @langchain/core, @langchain/anthropic, @langchain/openai, @langchain/google-genai, tsx
-  src/                    # five files, and no more without a reason (D13)
+  src/                    # five files, and no more without a reason (D13). No fakes here (D14).
     cli.ts                # the flags, and the exit code. Nothing else.
     index.ts              # the pipeline: domains → fetch → extract → merge → date → write, plus the log
-    harmonic.ts           # the HTTP client, the offline mock, and toEvidence/toFacts (tolerant field picking)
-    llm.ts                # provider factory, ExtractionSchema, the prompt, the offline mock
+    harmonic.ts           # the HTTP client, and toEvidence/toFacts (tolerant field picking)
+    llm.ts                # provider factory, ExtractionSchema, the prompt
     tools.ts              # the pure parts: paths, domains file, dates, buildRecord, mapPool, writers
-  test/                   # one test file per source file
-    fixtures/domains.txt       # the 5-domain file the e2e test and the README use
+  scripts/
+    example-schedule.ts   # re-date companies.example.json to start today — the keyless path
+  test/
+    fixtures/domains.txt       # the 5-domain file pipeline.test.ts uses
     fixtures/harmonic/*.json   # 3–4 anonymised real responses (snake_case) — record on first run
     fixture-server.ts          # http.createServer serving fixtures by website_domain
+    fake-llm.ts                # the LLM test double, canned per fixture domain
     tools.test.ts
     harmonic.test.ts      # the client (retries, 404, abort) and the field picking
-    llm.mock.test.ts
-    cli.e2e.test.ts       # runs the CLI with mock provider + fixture Harmonic server
+    llm.test.ts           # provider inference and ExtractionSchema
+    pipeline.test.ts      # extract() in process: real Harmonic client + fixture server + fake LLM
+    cli.test.ts           # the CLI as a subprocess: flags, validate, exit codes
 ```
 
-Testing the Harmonic client: spin up a tiny `http.createServer` in the test that serves fixtures
-by domain, and point `HARMONIC_BASE_URL` at it. Never call the real API in tests.
+Testing: spin up a tiny `http.createServer` that serves fixtures by domain and point the client's
+`baseUrl` (or `HARMONIC_BASE_URL`) at it; pass a fake LLM to `extract(options, clients)`. Never
+call the real API in tests, and never ship a fake in `src/` (D14).
 
 ## Operational notes for the README
 

@@ -60,29 +60,35 @@ workspace has a placeholder test).
 
 ## Phase 2 — `extractor/`
 
-Five files, per D13 — `cli.ts`, `index.ts`, `harmonic.ts`, `llm.ts`, `tools.ts` — and no cache.
+Five files, per D13 — `cli.ts`, `index.ts`, `harmonic.ts`, `llm.ts`, `tools.ts` — no cache, and no
+fake provider in `src/` (D14): `extract(options, clients?)` takes its two clients, and the test
+doubles live in `test/`.
 
 - `tools.ts`: domain normalise/dedupe (tests with messy input), `assignDates` (tests: gaps never
   produced; rejected domains skipped), `buildRecord`, `mapPool`, the writers.
-- `harmonic.ts` with `HARMONIC_BASE_URL` override, retries/backoff, abort-on-401/403, and the
-  offline `mock` path (deterministic fake company from the domain). Test against an in-process
-  fixture server. Record 3–4 real responses into `test/fixtures/harmonic/` on the first real run
+- `harmonic.ts` with `HARMONIC_BASE_URL` override, retries/backoff, abort-on-401/403. Test against
+  an in-process fixture server. Record 3–4 real responses into `test/fixtures/harmonic/` on the first real run
   (strip `employees`, `investors`, emails) — until then, use hand-written fixtures in the
   snake_case shape from `03-extractor.md` and mark them `"_fixture": "unverified"`. Tolerant field
   picking lives here too (tests: snake_case and camelCase inputs produce the same evidence;
   `tags_v2` as strings and as objects).
-- `llm.ts`: provider factory (anthropic/openai/gemini via LangChain.js chat models, plus `mock`),
-  `withStructuredOutput(ExtractionSchema)`, one schema-failure retry. Test with `mock` only.
+- `llm.ts`: provider factory (anthropic/openai/gemini via LangChain.js chat models),
+  `withStructuredOutput(ExtractionSchema)`, one schema-failure retry. Tests cover provider
+  inference and the schema; the network path is exercised by a real run, not by a test.
 - `cli.ts` with commander: `extract` (default) and `validate`; `index.ts` has the pretty per-domain
   log lines and the final summary/rejection warning exactly as in `03`.
-- E2E test: fixture Harmonic server + mock LLM + a 5-domain file (one 404, one missing headcount)
-  → 3 records dated `start`, `start+1`, `start+2`; `rejected.json` has 2 entries; a second run
-  reproduces the same schedule.
+- `pipeline.test.ts`: real Harmonic client against the fixture server + the fake LLM from `test/`,
+  over a 5-domain file (one 404, one missing headcount) → 3 records dated `start`, `start+1`,
+  `start+2`; `rejected.json` has 2 entries; the rejected domains never reach the model; a second
+  run reproduces the same schedule. `cli.test.ts` covers the flags and the exit codes as a
+  subprocess.
+- `scripts/example-schedule.ts`: re-dates `companies.example.json` to start today. This is the
+  keyless path — the extractor itself always needs keys.
 
-**Accept:** `npm run extract -- -d extractor/test/fixtures/domains.txt -s 2026-10-01 --provider
-mock -o /tmp/out.json` works from the repo root with no keys and no network; output validates; a real run with
-`HARMONIC_API_KEY` + one LLM key on 3 domains produces sensible records (manual check — this is
-also when the Harmonic field names get verified and fixtures recorded).
+**Accept:** `npm test -w extractor` green with no keys and no network; `npm run example-schedule`
+writes a `data/companies.json` starting today that `npm run extract -- validate` accepts; a real
+run with `HARMONIC_API_KEY` + one LLM key on 3 domains produces sensible records (manual check —
+this is also when the Harmonic field names get verified and fixtures recorded).
 
 ---
 
@@ -135,7 +141,7 @@ at `http://localhost:8080` when `STATIC_DIR` points to it.
   how to back up. Link to `docs/`.
 
 **Accept:** `docker build .` < 250 MB uncompressed and the container starts with no network; after
-`npm run extract -- --provider mock -d extractor/test/fixtures/domains.txt -s "$(date -u +%F)"`,
+`npm run example-schedule`,
 `cd deploy && DOMAIN=:80 docker compose up -d --build` then `curl localhost/api/health` OK and the
 game plays in a browser; replacing `data/companies.json` on the host is picked up without restart;
 `create-vm.sh` + `deploy.sh` executed once for real against a GCP project (document the exact

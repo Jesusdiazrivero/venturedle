@@ -248,3 +248,32 @@ tunes it, and 3 is polite to Harmonic's rate limit).
 
 **Seam.** `harmonic.ts` and `llm.ts` each expose one client interface with one method. A cache is a
 decorator around either, in one file, if re-running ever becomes a real workflow.
+
+---
+
+### D14. No fakes in `src/`; the keyless path is a re-dated example file
+
+**Decision.** The extractor has no `mock` provider. `PROVIDERS` is `anthropic | openai | gemini`,
+and running it always needs a Harmonic key and one model key. `extract(options, clients?)` takes
+its two clients, so tests inject doubles that live in `test/` (`fake-llm.ts`, `fixture-server.ts`).
+The no-keys path is `npm run example-schedule`, which re-dates the committed
+`data/companies.example.json` to start today.
+
+**Why.** The mock provider was 166 lines of invented company data — `MOCK_PLACES`, `MOCK_STAGES`,
+`MOCK_HEADCOUNTS`, `MOCK_FUNDING`, `MOCK_TAGS` — shipped in the binary to serve one documented
+demo command. The mock Harmonic client had no test users at all (the tests use a fixture HTTP
+server, which is a truer double), and the mock LLM's `mapFundingStage` was a second implementation
+of a rule that only exists in `SYSTEM_PROMPT`, free to drift from it. Test doubles belong in
+`test/`, behind an injection seam; a demo needs demo *data*, not a fake *provider*.
+
+**What it costs.** You can no longer generate a schedule from your own domains without keys.
+`example-schedule` gives you 30 hand-written companies dated from today — enough to play and to
+run `docker compose up` — but the schedule is the same for everyone who does it.
+
+**Rejected.** Keeping the mock LLM only (still a fake in `src/`, and the injection seam makes it
+redundant); a fake LLM *HTTP* server in tests so the CLI subprocess could run the real LangChain
+path (it would mean encoding three providers' tool-call wire formats — the pipeline test covers
+the pipeline, and the LangChain call itself is covered by a real run).
+
+**Seam.** `Clients` in `index.ts`. Anything satisfying `HarmonicClient` and `LlmClient` can be
+handed to `extract`.

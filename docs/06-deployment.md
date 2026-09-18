@@ -101,7 +101,7 @@ Both have a committed `.example`. Compose also reads `deploy/.env` for the
 Local production-like run (no keys): first make a schedule that starts today, then bring it up:
 
 ```bash
-npm run extract -- --provider mock -d extractor/test/fixtures/domains.txt -s "$(date -u +%F)"
+npm run example-schedule          # re-dates data/companies.example.json to start today
 cd deploy && cp .env.example .env && DOMAIN=:80 docker compose up -d --build   # → http://localhost
 ```
 
