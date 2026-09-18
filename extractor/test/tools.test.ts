@@ -7,7 +7,7 @@ import {
   assignDates,
   buildRecord,
   isDomain,
-  mapPool,
+  mapConcurrent,
   normaliseDomain,
   parseDomainsFile,
 } from "../src/tools.js";
@@ -129,10 +129,10 @@ describe("assignDates", () => {
   });
 });
 
-describe("mapPool", () => {
+describe("mapConcurrent", () => {
   it("returns results in input order regardless of completion order", async () => {
     const delays = [30, 0, 20, 10, 0];
-    const results = await mapPool(delays, 2, async (ms) => {
+    const results = await mapConcurrent(delays, 2, async (ms) => {
       await new Promise((resolve) => setTimeout(resolve, ms));
       return ms;
     });
@@ -142,7 +142,7 @@ describe("mapPool", () => {
   it("never runs more than `limit` at once", async () => {
     let running = 0;
     let peak = 0;
-    await mapPool([1, 2, 3, 4, 5, 6, 7], 3, async () => {
+    await mapConcurrent([1, 2, 3, 4, 5, 6, 7], 3, async () => {
       peak = Math.max(peak, ++running);
       await new Promise((resolve) => setTimeout(resolve, 5));
       running--;

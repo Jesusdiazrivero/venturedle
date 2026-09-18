@@ -12,26 +12,13 @@ import {
   bucketOf,
   type Company,
 } from "@venturedle/shared/server";
-import {
-  createHarmonicClient,
-  toEvidence,
-  toFacts,
-  type HarmonicClient,
-} from "./harmonic.js";
-import {
-  LlmInvalidOutputError,
-  PROVIDERS,
-  apiKeyFor,
-  createLlmClient,
-  inferProvider,
-  type LlmClient,
-  type Provider,
-} from "./llm.js";
+import { toEvidence, toFacts, type HarmonicClient } from "./harmonic.js";
+import { LlmInvalidOutputError, type LlmClient } from "./llm.js";
 import {
   addUtcDays,
   assignDates,
   buildRecord,
-  mapPool,
+  mapConcurrent,
   readDomainsFile,
   rejectedPathFor,
   relativeToRoot,
@@ -47,52 +34,23 @@ import {
 const CONCURRENCY = 3;
 
 export interface ExtractOptions {
-  domains?: string;
-  start?: string;
+  /** path to the domains file, relative to the repo root */
+  domains: string;
+  /** the first puzzle date, YYYY-MM-DD */
+  start: string;
+  /** where to write the schedule, relative to the repo root */
   out: string;
-  provider?: string;
-  model?: string;
 }
 
-type Outcome =
-  | { ok: true; record: UndatedCompany; lowConfidence: boolean }
-  | { ok: false; reason: RejectionReason; harmonicId?: number };
-
-function resolveProvider(requested: string | undefined): Provider {
-  if (requested === undefined) return inferProvider(process.env);
-  if (!(PROVIDERS as readonly string[]).includes(requested)) {
-    throw new Error(
-      `unknown --provider "${requested}". Use one of: ${PROVIDERS.join(", ")}`,
-    );
-  }
-  return requested as Provider;
-}
-
-/**
- * The two external edges, built from the environment. Tests pass their own doubles to `extract`
- * instead of going through here — there is no fake provider in the shipped code.
- */
+/** The two external edges. `cli.ts` builds them from the environment; tests pass their own. */
 export interface Clients {
   harmonic: HarmonicClient;
   llm: LlmClient;
 }
 
-function createClients(options: ExtractOptions): Clients {
-  const provider = resolveProvider(options.provider);
-
-  const apiKey = process.env.HARMONIC_API_KEY?.trim();
-  if (!apiKey) throw new Error("HARMONIC_API_KEY is not set");
-  const baseUrl = process.env.HARMONIC_BASE_URL?.trim();
-
-  return {
-    harmonic: createHarmonicClient({ apiKey, ...(baseUrl ? { baseUrl } : {}) }),
-    llm: createLlmClient({
-      provider,
-      ...(options.model ? { model: options.model } : {}),
-      apiKey: apiKeyFor(provider, process.env),
-    }),
-  };
-}
+type Outcome =
+  | { ok: true; record: UndatedCompany; lowConfidence: boolean }
+  | { ok: false; reason: RejectionReason; harmonicId?: number };
 
 async function processDomain(
   domain: string,
@@ -149,22 +107,17 @@ function describe(record: UndatedCompany): string {
 }
 
 export async function extract(
-  options: ExtractOptions,
-  clients?: Clients,
+  { domains: domainsFile, start, out }: ExtractOptions,
+  { harmonic, llm }: Clients,
 ): Promise<void> {
-  if (!options.domains) throw new Error("--domains is required");
-  if (!options.start) throw new Error("--start is required");
-  const start = options.start;
-
-  const outFile = resolveFromRoot(options.out);
-  const domains = await readDomainsFile(resolveFromRoot(options.domains));
-  const { harmonic, llm } = clients ?? createClients(options);
+  const outFile = resolveFromRoot(out);
+  const domains = await readDomainsFile(resolveFromRoot(domainsFile));
 
   console.log(
     `Extracting ${domains.length} domains with ${llm.label}, starting ${start}`,
   );
 
-  const outcomes = await mapPool(domains, CONCURRENCY, (domain) =>
+  const outcomes = await mapConcurrent(domains, CONCURRENCY, (domain) =>
     processDomain(domain, harmonic, llm),
   );
 

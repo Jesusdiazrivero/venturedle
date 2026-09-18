@@ -259,6 +259,11 @@ its two clients, so tests inject doubles that live in `test/` (`fake-llm.ts`, `f
 The no-keys path is `npm run example-schedule`, which re-dates the committed
 `data/companies.example.json` to start today.
 
+`extract` takes `Clients` as a required argument rather than an optional override: an optional
+parameter would mean the pipeline still knows how to reach the network, and "which branch ran"
+becomes a thing to reason about. `cli.ts` is the composition root — it is the only file that reads
+`process.env` or validates a flag.
+
 **Why.** The mock provider was 166 lines of invented company data — `MOCK_PLACES`, `MOCK_STAGES`,
 `MOCK_HEADCOUNTS`, `MOCK_FUNDING`, `MOCK_TAGS` — shipped in the binary to serve one documented
 demo command. The mock Harmonic client had no test users at all (the tests use a fixture HTTP

@@ -259,7 +259,7 @@ domain is fetched and extracted again.
 extractor/
   package.json            # scripts.extract = "tsx src/cli.ts"; deps: commander, zod, @langchain/core, @langchain/anthropic, @langchain/openai, @langchain/google-genai, tsx
   src/                    # five files, and no more without a reason (D13). No fakes here (D14).
-    cli.ts                # the flags, and the exit code. Nothing else.
+    cli.ts                # composition root: the flags, env → clients, the exit code
     index.ts              # the pipeline: domains → fetch → extract → merge → date → write, plus the log
     harmonic.ts           # the HTTP client, and toEvidence/toFacts (tolerant field picking)
     llm.ts                # provider factory, ExtractionSchema, the prompt
@@ -278,9 +278,10 @@ extractor/
     cli.test.ts           # the CLI as a subprocess: flags, validate, exit codes
 ```
 
-Testing: spin up a tiny `http.createServer` that serves fixtures by domain and point the client's
-`baseUrl` (or `HARMONIC_BASE_URL`) at it; pass a fake LLM to `extract(options, clients)`. Never
-call the real API in tests, and never ship a fake in `src/` (D14).
+`extract(options, clients)` takes both clients; `cli.ts` is the only thing that reads `process.env`
+or validates a flag. Testing: spin up a tiny `http.createServer` that serves fixtures by domain,
+point the client's `baseUrl` at it, and pass a fake LLM. Never call the real API in tests, and
+never ship a fake in `src/` (D14).
 
 ## Operational notes for the README
 

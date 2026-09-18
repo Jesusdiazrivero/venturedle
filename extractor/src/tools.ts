@@ -226,8 +226,11 @@ export function buildRecord(args: {
 
 // --- running -------------------------------------------------------------------------------
 
-/** Bounded concurrency, results in input order. */
-export async function mapPool<T, R>(
+/**
+ * Runs `fn` over every item, at most `limit` at a time, and returns the results in **input**
+ * order — which is what lets the caller date and report them in the order the operator wrote them.
+ */
+export async function mapConcurrent<T, R>(
   items: readonly T[],
   limit: number,
   fn: (item: T) => Promise<R>,
