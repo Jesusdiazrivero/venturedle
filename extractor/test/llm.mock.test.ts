@@ -4,14 +4,13 @@ import {
   FUNDING_STAGES,
   SECTORS,
 } from "@venturedle/shared/server";
-import { toEvidence } from "../src/evidence.js";
+import { toEvidence, type Evidence } from "../src/harmonic.js";
 import {
   ExtractionSchema,
   createLlmClient,
   createMockLlmClient,
   mapFundingStage,
 } from "../src/llm.js";
-import type { Evidence } from "../src/evidence.js";
 
 const klarna = toEvidence("klarna.com", {
   name: "Klarna",

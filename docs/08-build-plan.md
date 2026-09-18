@@ -25,7 +25,7 @@ Create the workspace skeleton so every later phase drops into place.
   `--env-file` for the root `.env`.
 - `tsconfig.base.json` (`strict`, `module: NodeNext`, `target: ES2022`, `noEmit`), per-workspace
   `tsconfig.json` extending it; `typecheck` runs `tsc -p` in each workspace.
-- `.gitignore` (`node_modules`, `dist`, `.env`, `deploy/.env`, `.cache`, `data/venturedle.db*`,
+- `.gitignore` (`node_modules`, `dist`, `.env`, `deploy/.env`, `data/venturedle.db*`,
   `data/rejected.json`), `.nvmrc`, `.env.example` + `deploy/.env.example` (documented in
   `03`/`04`/`06`), `.dockerignore`.
 - `CLAUDE.md` (from these docs), `README.md` stub, `LICENSE` (MIT), `docs/` copied in.
@@ -60,24 +60,24 @@ workspace has a placeholder test).
 
 ## Phase 2 — `extractor/`
 
-- `domains.ts` (normalise/dedupe; tests with messy input), `schedule.ts` (tests: gaps never
-  produced; rejected domains skipped), `write.ts`.
-- `harmonic.ts` with `HARMONIC_BASE_URL` override, retries/backoff, abort-on-401/403, disk cache,
-  and the offline `mock` path (deterministic fake company from the domain). Test against an
-  in-process fixture server. Record 3–4 real responses into `test/fixtures/harmonic/` on the first
-  real run (strip `employees`, `investors`, emails) — until then, use hand-written fixtures in the
-  snake_case shape from `03-extractor.md` and mark them `"_fixture": "unverified"`.
-- `evidence.ts` with tolerant field picking (tests: snake_case and camelCase inputs produce the same
-  evidence; `tags_v2` as strings and as objects).
+Five files, per D13 — `cli.ts`, `index.ts`, `harmonic.ts`, `llm.ts`, `tools.ts` — and no cache.
+
+- `tools.ts`: domain normalise/dedupe (tests with messy input), `assignDates` (tests: gaps never
+  produced; rejected domains skipped), `buildRecord`, `mapPool`, the writers.
+- `harmonic.ts` with `HARMONIC_BASE_URL` override, retries/backoff, abort-on-401/403, and the
+  offline `mock` path (deterministic fake company from the domain). Test against an in-process
+  fixture server. Record 3–4 real responses into `test/fixtures/harmonic/` on the first real run
+  (strip `employees`, `investors`, emails) — until then, use hand-written fixtures in the
+  snake_case shape from `03-extractor.md` and mark them `"_fixture": "unverified"`. Tolerant field
+  picking lives here too (tests: snake_case and camelCase inputs produce the same evidence;
+  `tags_v2` as strings and as objects).
 - `llm.ts`: provider factory (anthropic/openai/gemini via LangChain.js chat models, plus `mock`),
-  `withStructuredOutput(ExtractionSchema)`, one schema-failure retry, disk cache keyed by
-  prompt+schema+model hash.
-  Test with `mock` only.
-- `cli.ts` with commander: `extract` (default) and `validate`. Pretty per-domain log lines and the
-  final summary/rejection warning exactly as in `03`.
+  `withStructuredOutput(ExtractionSchema)`, one schema-failure retry. Test with `mock` only.
+- `cli.ts` with commander: `extract` (default) and `validate`; `index.ts` has the pretty per-domain
+  log lines and the final summary/rejection warning exactly as in `03`.
 - E2E test: fixture Harmonic server + mock LLM + a 5-domain file (one 404, one missing headcount)
-  → 3 records dated `start`, `start+1`, `start+2`; `rejected.json` has 2 entries; second run hits
-  cache (assert the fixture server receives zero requests).
+  → 3 records dated `start`, `start+1`, `start+2`; `rejected.json` has 2 entries; a second run
+  reproduces the same schedule.
 
 **Accept:** `npm run extract -- -d extractor/test/fixtures/domains.txt -s 2026-10-01 --provider
 mock -o /tmp/out.json` works from the repo root with no keys and no network; output validates; a real run with

@@ -160,8 +160,15 @@ describe("extract", () => {
     expect(firstRun.stdout).toContain("⚠ Rejections shift the schedule.");
   });
 
-  it("costs nothing on the second run — every domain is cached", async () => {
-    server.reset();
+  it("is deterministic: a second run reproduces the same schedule", async () => {
+    // Only the timestamps move — `generatedAt` and `source.harmonicFetchedAt`.
+    const undated = (file: CompaniesFile) =>
+      file.companies.map(({ source, ...rest }) => ({
+        ...rest,
+        source: { ...source, harmonicFetchedAt: undefined },
+      }));
+
+    const before = undated(await readOut());
     const second = await runCli([
       "-d",
       DOMAINS,
@@ -173,31 +180,7 @@ describe("extract", () => {
       "mock",
     ]);
     expect(second.code).toBe(0);
-    expect(server.requests).toEqual([]);
-    expect(second.stdout).toContain("Wrote 3 companies");
-  }, 60_000);
-
-  it("--dry-run leaves --out alone but still writes the rejections", async () => {
-    const dryOut = path.join(workDir, "dry", "companies.json");
-    const result = await runCli([
-      "-d",
-      DOMAINS,
-      "-s",
-      START,
-      "-o",
-      dryOut,
-      "--provider",
-      "mock",
-      "--dry-run",
-    ]);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Dry run: 3 companies");
-    await expect(readFile(dryOut, "utf8")).rejects.toThrow();
-    expect(
-      JSON.parse(
-        await readFile(path.join(workDir, "dry", "rejected.json"), "utf8"),
-      ),
-    ).toHaveLength(2);
+    expect(undated(await readOut())).toEqual(before);
   }, 60_000);
 
   it("aborts with exit code 2 when Harmonic rejects the key", async () => {
@@ -212,11 +195,8 @@ describe("extract", () => {
         path.join(workDir, "nope.json"),
         "--provider",
         "mock",
-        "--no-cache",
       ],
-      {
-        HARMONIC_BASE_URL: unauthorised.url,
-      },
+      { HARMONIC_BASE_URL: unauthorised.url },
     );
     await unauthorised.close();
     expect(result.code).toBe(2);

@@ -1,21 +1,19 @@
 /**
- * The only thing that talks to Harmonic. Returns the raw response body — mapping happens in
- * `evidence.ts` so a wrong field name can be fixed against the cache without spending credits.
+ * Everything Harmonic-shaped: the HTTP call, the offline mock, and the mapping from a raw response
+ * to the two things the pipeline needs — the numbers we copy verbatim (`HarmonicFacts`) and the
+ * compact, LLM-facing `Evidence`.
+ *
+ * Field picking is deliberately tolerant: the REST API is believed to return snake_case and the
+ * MCP layer returns camelCase, so every accessor accepts both. `docs/03-extractor.md` has the
+ * table of intents; this file is its implementation.
  */
-import { createCache, type Cache } from "./cache.js";
-import { AbortRunError, type RejectionReason } from "./types.js";
+import { AbortRunError, hashDomain, type RejectionReason } from "./tools.js";
 
 export const DEFAULT_BASE_URL = "https://api.harmonic.ai";
 
 /** 429 backoff, in ms; running out of them is `harmonic_rate_limited`. */
 const RATE_LIMIT_BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
 const SERVER_ERROR_RETRIES = 3;
-
-export interface CachedResponse {
-  fetchedAt: string;
-  status: number;
-  body: unknown;
-}
 
 export type HarmonicFetch =
   | { ok: true; fetchedAt: string; body: unknown }
@@ -28,8 +26,6 @@ export interface HarmonicClient {
 export interface HarmonicOptions {
   apiKey: string;
   baseUrl?: string;
-  /** null disables caching (`--no-cache`) */
-  cacheDir?: string | null;
   fetchImpl?: typeof fetch;
   /** injected in tests so backoff does not actually wait */
   sleep?: (ms: number) => Promise<void>;
@@ -37,13 +33,6 @@ export interface HarmonicOptions {
 
 const defaultSleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-function toFetch(cached: CachedResponse): HarmonicFetch {
-  if (cached.status === 404) return { ok: false, reason: "harmonic_not_found" };
-  if (isMissingRecord(cached.body))
-    return { ok: false, reason: "harmonic_not_found" };
-  return { ok: true, fetchedAt: cached.fetchedAt, body: cached.body };
-}
 
 /** Harmonic answers "no record" either with a 404 or with a 200 carrying `id: -1`. */
 function isMissingRecord(body: unknown): boolean {
@@ -58,102 +47,257 @@ export function createHarmonicClient(options: HarmonicOptions): HarmonicClient {
   const baseUrl = (options.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "");
   const doFetch = options.fetchImpl ?? fetch;
   const sleep = options.sleep ?? defaultSleep;
-  const cache: Cache = createCache(options.cacheDir ?? null);
-
-  async function request(domain: string): Promise<CachedResponse> {
-    const url = `${baseUrl}/companies?website_domain=${encodeURIComponent(domain)}`;
-    let rateLimited = 0;
-    let serverErrors = 0;
-
-    for (;;) {
-      let res: Response;
-      try {
-        res = await doFetch(url, {
-          method: "POST",
-          headers: { apikey: options.apiKey, accept: "application/json" },
-        });
-      } catch (err) {
-        // A connection failure is as retryable as a 500.
-        if (serverErrors++ >= SERVER_ERROR_RETRIES) {
-          throw new HarmonicFailure(
-            "harmonic_error",
-            `${domain}: ${(err as Error).message}`,
-          );
-        }
-        await sleep(1_000);
-        continue;
-      }
-
-      if (res.status === 401 || res.status === 403) {
-        throw new AbortRunError(
-          `Harmonic returned ${res.status} for ${domain} — check HARMONIC_API_KEY.`,
-        );
-      }
-      if (res.status === 404) {
-        return { fetchedAt: new Date().toISOString(), status: 404, body: null };
-      }
-      if (res.status === 429) {
-        const delay = RATE_LIMIT_BACKOFF_MS[rateLimited++];
-        if (delay === undefined)
-          throw new HarmonicFailure("harmonic_rate_limited", domain);
-        await sleep(delay);
-        continue;
-      }
-      if (res.status >= 500) {
-        if (serverErrors++ >= SERVER_ERROR_RETRIES) {
-          throw new HarmonicFailure(
-            "harmonic_error",
-            `${domain}: HTTP ${res.status}`,
-          );
-        }
-        await sleep(1_000);
-        continue;
-      }
-      if (!res.ok) {
-        throw new HarmonicFailure(
-          "harmonic_error",
-          `${domain}: HTTP ${res.status}`,
-        );
-      }
-      return {
-        fetchedAt: new Date().toISOString(),
-        status: res.status,
-        body: await res.json(),
-      };
-    }
-  }
 
   return {
     async fetchCompany(domain) {
-      const key = `harmonic/${domain}.json`;
-      const cached = await cache.read<CachedResponse>(key);
-      if (cached) return toFetch(cached); // cached 404s are honoured too — `--no-cache` retries them
+      const url = `${baseUrl}/companies?website_domain=${encodeURIComponent(domain)}`;
+      let rateLimited = 0;
+      let serverErrors = 0;
 
-      let fresh: CachedResponse;
-      try {
-        fresh = await request(domain);
-      } catch (err) {
-        if (err instanceof HarmonicFailure)
-          return { ok: false, reason: err.reason };
-        throw err;
+      for (;;) {
+        let res: Response;
+        try {
+          res = await doFetch(url, {
+            method: "POST",
+            headers: { apikey: options.apiKey, accept: "application/json" },
+          });
+        } catch {
+          // A connection failure is as retryable as a 500.
+          if (serverErrors++ >= SERVER_ERROR_RETRIES)
+            return { ok: false, reason: "harmonic_error" };
+          await sleep(1_000);
+          continue;
+        }
+
+        if (res.status === 401 || res.status === 403) {
+          throw new AbortRunError(
+            `Harmonic returned ${res.status} for ${domain} — check HARMONIC_API_KEY.`,
+          );
+        }
+        if (res.status === 404)
+          return { ok: false, reason: "harmonic_not_found" };
+        if (res.status === 429) {
+          const delay = RATE_LIMIT_BACKOFF_MS[rateLimited++];
+          if (delay === undefined)
+            return { ok: false, reason: "harmonic_rate_limited" };
+          await sleep(delay);
+          continue;
+        }
+        if (res.status >= 500) {
+          if (serverErrors++ >= SERVER_ERROR_RETRIES)
+            return { ok: false, reason: "harmonic_error" };
+          await sleep(1_000);
+          continue;
+        }
+        if (!res.ok) return { ok: false, reason: "harmonic_error" };
+
+        const body = await res.json();
+        if (isMissingRecord(body))
+          return { ok: false, reason: "harmonic_not_found" };
+        return { ok: true, fetchedAt: new Date().toISOString(), body };
       }
-      await cache.write(key, fresh);
-      return toFetch(fresh);
     },
   };
 }
 
-class HarmonicFailure extends Error {
-  constructor(
-    readonly reason: RejectionReason,
-    detail: string,
-  ) {
-    super(`${reason}: ${detail}`);
-    this.name = "HarmonicFailure";
-  }
+// --- field picking -------------------------------------------------------------------------
+
+export interface Evidence {
+  domain: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  customerType: string | null;
+  location: {
+    country: string | null;
+    state: string | null;
+    city: string | null;
+  };
+  /** `YYYY-MM-DD` */
+  foundingDate: string | null;
+  funding: {
+    stageRaw: string | null;
+    totalUsd: number | null;
+    roundTypes: string[];
+  };
+  headcount: number | null;
 }
 
-const MOCK_COUNTRIES = [
+/** The fields the LLM is never allowed to touch, plus the identity ones. */
+export interface HarmonicFacts {
+  harmonicId?: number;
+  name: string;
+  logoUrl: string;
+  headcount: number | null;
+  totalFundingUsd: number | null;
+  foundedYear: number | null;
+}
+
+function get(obj: unknown, path: string): unknown {
+  let cur = obj;
+  for (const segment of path.split(".")) {
+    if (typeof cur !== "object" || cur === null) return undefined;
+    cur = (cur as Record<string, unknown>)[segment];
+  }
+  return cur;
+}
+
+/** First path that yields something other than `undefined`/`null`. */
+export function pick(obj: unknown, paths: readonly string[]): unknown {
+  for (const path of paths) {
+    const value = get(obj, path);
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function pickString(obj: unknown, paths: readonly string[]): string | null {
+  const value = pick(obj, paths);
+  if (typeof value !== "string") return null;
+  return value.trim() || null;
+}
+
+function pickNumber(obj: unknown, paths: readonly string[]): number | null {
+  const value = pick(obj, paths);
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  // Large funding totals come back as strings from some serialisers.
+  if (
+    typeof value === "string" &&
+    value.trim() !== "" &&
+    Number.isFinite(Number(value))
+  ) {
+    return Number(value);
+  }
+  return null;
+}
+
+/** `tags_v2` is an array of strings *or* of `{ type, display_value }` objects. Flatten to strings. */
+function pickTags(raw: unknown): string[] {
+  const value = pick(raw, ["tags_v2", "tagsV2", "tags"]);
+  if (!Array.isArray(value)) return [];
+  const tags: string[] = [];
+  for (const tag of value) {
+    if (typeof tag === "string") {
+      if (tag.trim()) tags.push(tag.trim());
+      continue;
+    }
+    const label = pickString(tag, [
+      "display_value",
+      "displayValue",
+      "value",
+      "name",
+    ]);
+    if (label) tags.push(label);
+  }
+  return [...new Set(tags)];
+}
+
+/** `customer_type` is a string or an array of strings. */
+function pickCustomerType(raw: unknown): string | null {
+  const value = pick(raw, ["customer_type", "customerType"]);
+  if (typeof value === "string") return value.trim() || null;
+  if (Array.isArray(value)) {
+    const values = value.filter(
+      (v): v is string => typeof v === "string" && v.trim() !== "",
+    );
+    return values.length ? values.join(", ") : null;
+  }
+  return null;
+}
+
+function pickRoundTypes(raw: unknown): string[] {
+  const rounds = pick(raw, ["funding.funding_rounds", "funding.fundingRounds"]);
+  if (!Array.isArray(rounds)) return [];
+  const types: string[] = [];
+  for (const round of rounds) {
+    const type = pickString(round, [
+      "funding_round_type",
+      "fundingRoundType",
+      "type",
+    ]);
+    if (type) types.push(type);
+  }
+  return types;
+}
+
+function pickFoundingDate(raw: unknown): string | null {
+  const value = pickString(raw, [
+    "founding_date.date",
+    "foundingDate.date",
+    "founding_date",
+    "foundingDate",
+  ]);
+  if (!value) return null;
+  const date = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+}
+
+function nameOf(domain: string, raw: unknown): string {
+  const name = pickString(raw, ["name", "legal_name", "legalName"]);
+  if (name) return name;
+  const label = domain.split(".")[0]!;
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+export function toEvidence(domain: string, raw: unknown): Evidence {
+  return {
+    domain,
+    name: nameOf(domain, raw),
+    description: pickString(raw, ["description"]),
+    tags: pickTags(raw),
+    customerType: pickCustomerType(raw),
+    location: {
+      country: pickString(raw, ["location.country", "headquarters.country"]),
+      state: pickString(raw, ["location.state", "headquarters.state"]),
+      city: pickString(raw, ["location.city", "headquarters.city"]),
+    },
+    foundingDate: pickFoundingDate(raw),
+    funding: {
+      stageRaw: pickString(raw, [
+        "funding.funding_stage",
+        "funding.fundingStage",
+      ]),
+      totalUsd: pickNumber(raw, [
+        "funding.funding_total",
+        "funding.fundingTotal",
+      ]),
+      roundTypes: pickRoundTypes(raw),
+    },
+    headcount: pickNumber(raw, [
+      "headcount",
+      "employee_count",
+      "employeeCount",
+    ]),
+  };
+}
+
+export function toFacts(domain: string, raw: unknown): HarmonicFacts {
+  const harmonicId = pickNumber(raw, ["id"]);
+  const foundingDate = pickFoundingDate(raw);
+  return {
+    ...(harmonicId !== null && Number.isInteger(harmonicId)
+      ? { harmonicId }
+      : {}),
+    name: nameOf(domain, raw),
+    logoUrl:
+      pickString(raw, ["logo_url", "logoUrl"]) ??
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    headcount: pickNumber(raw, [
+      "headcount",
+      "employee_count",
+      "employeeCount",
+    ]),
+    totalFundingUsd: pickNumber(raw, [
+      "funding.funding_total",
+      "funding.fundingTotal",
+    ]),
+    foundedYear: foundingDate ? Number(foundingDate.slice(0, 4)) : null,
+  };
+}
+
+// --- the offline mock ----------------------------------------------------------------------
+
+const MOCK_PLACES = [
   { country: "Sweden", state: "Stockholm County", city: "Stockholm" },
   { country: "United States", state: "California", city: "San Francisco" },
   { country: "Germany", state: "Berlin", city: "Berlin" },
@@ -187,16 +331,6 @@ const MOCK_TAGS = [
   ["Cybersecurity", "Enterprise Software"],
 ];
 
-/** FNV-1a. Any stable hash would do; this one is four lines and needs no dependency. */
-export function hashDomain(domain: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < domain.length; i++) {
-    h ^= domain.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h;
-}
-
 /**
  * `--provider mock` with no `HARMONIC_BASE_URL`: a plausible company invented from the domain, in
  * the same snake_case shape as the real API, so the rest of the pipeline is exercised unchanged.
@@ -207,7 +341,6 @@ export function createMockHarmonicClient(): HarmonicClient {
       const h = hashDomain(domain);
       const label = domain.split(".")[0]!;
       const name = label.charAt(0).toUpperCase() + label.slice(1);
-      const place = MOCK_COUNTRIES[h % MOCK_COUNTRIES.length]!;
       const stage = MOCK_STAGES[h % MOCK_STAGES.length]!;
       return {
         ok: true,
@@ -226,7 +359,7 @@ export function createMockHarmonicClient(): HarmonicClient {
               stage === "EXITED" ? [{ funding_round_type: "IPO" }] : [],
           },
           founding_date: { date: `${1995 + (h % 30)}-06-01` },
-          location: place,
+          location: MOCK_PLACES[h % MOCK_PLACES.length]!,
           tags_v2: MOCK_TAGS[h % MOCK_TAGS.length]!,
           customer_type: h % 2 === 0 ? "B2B" : "B2C",
         },

@@ -5,7 +5,6 @@
  *
  * LangChain is used for exactly two things: the provider factory and `withStructuredOutput`.
  */
-import { createHash } from "node:crypto";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import {
   BUSINESS_MODELS,
@@ -13,12 +12,55 @@ import {
   SECTORS,
 } from "@venturedle/shared/server";
 import { z } from "zod";
-import { createCache, type Cache } from "./cache.js";
-import { countryCodeOf } from "./countries.js";
-import type { Evidence } from "./evidence.js";
-import { hashDomain } from "./harmonic.js";
-import { DEFAULT_MODELS, type Provider } from "./models.js";
-import { AbortRunError } from "./types.js";
+import type { Evidence } from "./harmonic.js";
+import { AbortRunError, hashDomain } from "./tools.js";
+
+export const PROVIDERS = ["anthropic", "openai", "gemini", "mock"] as const;
+export type Provider = (typeof PROVIDERS)[number];
+export type KeyedProvider = Exclude<Provider, "mock">;
+
+/** These go stale. Check the provider's docs and use `--model` rather than editing for one run. */
+export const DEFAULT_MODELS: Record<Provider, string> = {
+  anthropic: "claude-opus-5",
+  openai: "gpt-5",
+  gemini: "gemini-2.5-pro",
+  mock: "mock",
+};
+
+/** `GEMINI_API_KEY` wins over LangChain's own `GOOGLE_API_KEY`, but both work. */
+const API_KEY_ENV: Record<KeyedProvider, readonly string[]> = {
+  anthropic: ["ANTHROPIC_API_KEY"],
+  openai: ["OPENAI_API_KEY"],
+  gemini: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+};
+
+export function apiKeyFor(
+  provider: KeyedProvider,
+  env: NodeJS.ProcessEnv,
+): string | undefined {
+  for (const name of API_KEY_ENV[provider]) {
+    const value = env[name]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+/**
+ * With no `--provider`, exactly one key must be set: zero is "nothing to run with", more than one
+ * is a coin toss the operator should not have to guess the outcome of.
+ */
+export function inferProvider(env: NodeJS.ProcessEnv): KeyedProvider {
+  const set = (["anthropic", "openai", "gemini"] as const).filter((p) =>
+    apiKeyFor(p, env),
+  );
+  if (set.length === 1) return set[0]!;
+  const detail =
+    set.length === 0 ? "none of" : `several of (${set.join(", ")})`;
+  throw new Error(
+    `Could not infer --provider: ${detail} ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY is set. ` +
+      `Pass --provider ${PROVIDERS.join("|")}.`,
+  );
+}
 
 /** What we accept back. `hqCountry` is re-checked here even though the prompt asks for ISO-2. */
 export const ExtractionSchema = z.object({
@@ -72,14 +114,6 @@ export const SYSTEM_PROMPT = [
   "  and the description or your own knowledge makes you confident; otherwise return null.",
 ].join("\n");
 
-/** Changing the taxonomy or the prompt must invalidate every cached extraction. */
-const SCHEMA_FINGERPRINT = JSON.stringify({
-  sectors: SECTORS,
-  businessModel: BUSINESS_MODELS,
-  fundingStage: FUNDING_STAGES,
-  fields: Object.keys(RequestSchema.shape),
-});
-
 export class LlmInvalidOutputError extends Error {
   constructor(detail: string) {
     super(`llm_invalid_output: ${detail}`);
@@ -98,38 +132,8 @@ interface StructuredRunnable {
   invoke(input: unknown): Promise<unknown>;
 }
 
-export interface LlmOptions {
-  provider: Provider;
-  model?: string;
-  apiKey?: string;
-  cacheDir?: string | null;
-}
-
-function humanPrompt(evidence: Evidence): string {
-  return `Evidence:\n${JSON.stringify(evidence, null, 2)}`;
-}
-
-function cacheKey(domain: string, label: string, prompt: string): string {
-  const hash = createHash("sha256")
-    .update(`${SYSTEM_PROMPT}\n${prompt}\n${SCHEMA_FINGERPRINT}\n${label}`)
-    .digest("hex")
-    .slice(0, 12);
-  return `llm/${domain}.${hash}.json`;
-}
-
-function isAuthError(err: unknown): boolean {
-  const status =
-    (err as { status?: number; statusCode?: number })?.status ??
-    (err as { statusCode?: number })?.statusCode;
-  if (status === 401 || status === 403) return true;
-  const message = err instanceof Error ? err.message : String(err);
-  return /\b(401|403)\b|invalid[_ ]api[_ ]key|authentication|unauthorized|permission denied/i.test(
-    message,
-  );
-}
-
 async function createChatModel(
-  provider: Provider,
+  provider: KeyedProvider,
   model: string,
   apiKey: string,
 ): Promise<BaseChatModel> {
@@ -148,24 +152,35 @@ async function createChatModel(
         await import("@langchain/google-genai");
       return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0 });
     }
-    case "mock":
-      throw new Error("the mock provider has no chat model");
   }
 }
 
-export function createLlmClient(options: LlmOptions): LlmClient {
+function isAuthError(err: unknown): boolean {
+  const status =
+    (err as { status?: number; statusCode?: number })?.status ??
+    (err as { statusCode?: number })?.statusCode;
+  if (status === 401 || status === 403) return true;
+  const message = err instanceof Error ? err.message : String(err);
+  return /\b(401|403)\b|invalid[_ ]api[_ ]key|authentication|unauthorized|permission denied/i.test(
+    message,
+  );
+}
+
+export function createLlmClient(options: {
+  provider: Provider;
+  model?: string;
+  apiKey?: string;
+}): LlmClient {
   if (options.provider === "mock") return createMockLlmClient();
 
-  const model = options.model ?? DEFAULT_MODELS[options.provider];
-  const label = `${options.provider}/${model}`;
-  const cache: Cache = createCache(options.cacheDir ?? null);
-  if (!options.apiKey)
-    throw new Error(`no API key for provider "${options.provider}"`);
-  const apiKey: string = options.apiKey;
+  const provider = options.provider;
+  const model = options.model ?? DEFAULT_MODELS[provider];
+  const apiKey = options.apiKey;
+  if (!apiKey) throw new Error(`no API key for provider "${provider}"`);
 
   let structured: Promise<StructuredRunnable> | undefined;
   function chain(): Promise<StructuredRunnable> {
-    structured ??= createChatModel(options.provider, model, apiKey).then((m) =>
+    structured ??= createChatModel(provider, model, apiKey!).then((m) =>
       m.withStructuredOutput(RequestSchema, { name: "extraction" }),
     );
     return structured;
@@ -183,63 +198,57 @@ export function createLlmClient(options: LlmOptions): LlmClient {
     } catch (err) {
       if (isAuthError(err)) {
         throw new AbortRunError(
-          `${options.provider} rejected the credentials — check your API key. (${(err as Error).message})`,
+          `${provider} rejected the credentials — check your API key. (${(err as Error).message})`,
         );
       }
       throw err;
     }
-    const parsed = ExtractionSchema.safeParse(normaliseRaw(raw));
-    if (!parsed.success)
+    // Providers occasionally lowercase or pad the country code; everything else must be exact.
+    const country = (raw as { hqCountry?: unknown })?.hqCountry;
+    const parsed = ExtractionSchema.safeParse(
+      typeof country === "string"
+        ? { ...(raw as object), hqCountry: country.trim().toUpperCase() }
+        : raw,
+    );
+    if (!parsed.success) {
       throw new LlmInvalidOutputError(
-        parsed.error.issues.map(issueLine).join("; "),
+        parsed.error.issues
+          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+          .join("; "),
       );
+    }
     return parsed.data;
   }
 
   return {
-    label,
+    label: `${provider}/${model}`,
     async extract(evidence) {
-      const prompt = humanPrompt(evidence);
-      const key = cacheKey(evidence.domain, label, prompt);
-      const cached = await cache.read<Extraction>(key);
-      if (cached) {
-        const parsed = ExtractionSchema.safeParse(cached);
-        if (parsed.success) return parsed.data;
-      }
-
-      let extraction: Extraction;
+      const prompt = `Evidence:\n${JSON.stringify(evidence, null, 2)}`;
       try {
-        extraction = await ask(prompt);
+        return await ask(prompt);
       } catch (err) {
         if (!(err instanceof LlmInvalidOutputError)) throw err;
         // One retry, with the validation error appended so the model can correct itself.
-        extraction = await ask(
+        return ask(
           `${prompt}\n\nYour previous answer was rejected: ${err.message}\nReturn a corrected object.`,
         );
       }
-      await cache.write(key, extraction);
-      return extraction;
     },
   };
 }
 
-function issueLine(issue: z.ZodIssue): string {
-  return `${issue.path.join(".") || "(root)"}: ${issue.message}`;
-}
+// --- the offline mock ----------------------------------------------------------------------
 
-/** Providers occasionally uppercase or pad the country code; everything else must be exact. */
-function normaliseRaw(raw: unknown): unknown {
-  if (typeof raw !== "object" || raw === null) return raw;
-  const obj = raw as Record<string, unknown>;
-  if (typeof obj.hqCountry === "string") {
-    return { ...obj, hqCountry: obj.hqCountry.trim().toUpperCase() };
-  }
-  return obj;
-}
-
-// --- mock provider -------------------------------------------------------------------------
-
-const MOCK_COUNTRIES = ["US", "GB", "DE", "ES", "SE", "SG", "BR"];
+/** Only the mock needs this: the real providers map country names themselves. */
+const MOCK_COUNTRY_CODES: Readonly<Record<string, string>> = {
+  brazil: "BR",
+  germany: "DE",
+  singapore: "SG",
+  spain: "ES",
+  sweden: "SE",
+  "united kingdom": "GB",
+  "united states": "US",
+};
 
 /**
  * The documented stage mapping, applied deterministically. The real providers are asked to do this
@@ -249,10 +258,9 @@ export function mapFundingStage(
   evidence: Evidence,
 ): (typeof FUNDING_STAGES)[number] {
   const raw = (evidence.funding.stageRaw ?? "").toUpperCase();
-  const rounds = evidence.funding.roundTypes.map((r) => r.toUpperCase());
-  const wentPublic = rounds.some(
-    (r) => r === "IPO" || r === "PUBLIC_EQUITY_OFFERING",
-  );
+  const wentPublic = evidence.funding.roundTypes
+    .map((r) => r.toUpperCase())
+    .some((r) => r === "IPO" || r === "PUBLIC_EQUITY_OFFERING");
   switch (raw) {
     case "PRE_SEED":
       return "Pre-seed";
@@ -278,48 +286,47 @@ export function mapFundingStage(
   return "Seed";
 }
 
-function mockSectors(evidence: Evidence, h: number): Extraction["sectors"] {
-  const known = evidence.tags.filter((tag): tag is (typeof SECTORS)[number] =>
-    (SECTORS as readonly string[]).includes(tag),
-  );
-  const picked = [...new Set(known)].slice(0, 3);
-  return picked.length ? picked : [SECTORS[h % SECTORS.length]!];
-}
-
-function mockBusinessModel(
-  evidence: Evidence,
-  h: number,
-): Extraction["businessModel"] {
-  const declared = (evidence.customerType ?? "")
-    .split(/[,/]/)
-    .map((v) => v.trim().toUpperCase())
-    .filter((v): v is (typeof BUSINESS_MODELS)[number] =>
-      (BUSINESS_MODELS as readonly string[]).includes(v),
-    );
-  return declared.length
-    ? [...new Set(declared)]
-    : [BUSINESS_MODELS[h % BUSINESS_MODELS.length]!];
-}
-
 /** Offline and deterministic: the same evidence always yields the same extraction. */
 export function createMockLlmClient(): LlmClient {
   return {
     label: "mock/mock",
     async extract(evidence) {
       const h = hashDomain(evidence.domain);
+      const sectors = [
+        ...new Set(
+          evidence.tags.filter((tag): tag is (typeof SECTORS)[number] =>
+            (SECTORS as readonly string[]).includes(tag),
+          ),
+        ),
+      ].slice(0, 3);
+      const models = [
+        ...new Set(
+          (evidence.customerType ?? "")
+            .split(/[,/]/)
+            .map((v) => v.trim().toUpperCase())
+            .filter((v): v is (typeof BUSINESS_MODELS)[number] =>
+              (BUSINESS_MODELS as readonly string[]).includes(v),
+            ),
+        ),
+      ];
+      const country = evidence.location.country?.trim().toLowerCase() ?? "";
       return {
-        sectors: mockSectors(evidence, h),
-        businessModel: mockBusinessModel(evidence, h),
+        sectors: sectors.length ? sectors : [SECTORS[h % SECTORS.length]!],
+        businessModel: models.length
+          ? models
+          : [BUSINESS_MODELS[h % BUSINESS_MODELS.length]!],
         hqCountry:
-          countryCodeOf(evidence.location.country) ??
-          MOCK_COUNTRIES[h % MOCK_COUNTRIES.length]!,
+          MOCK_COUNTRY_CODES[country] ??
+          Object.values(MOCK_COUNTRY_CODES)[
+            h % Object.keys(MOCK_COUNTRY_CODES).length
+          ]!,
         foundedYear: evidence.foundingDate
           ? Number(evidence.foundingDate.slice(0, 4))
           : 2015,
         fundingStage: mapFundingStage(evidence),
         confidence: "high",
         notes:
-          "mock provider — categories derived deterministically from the evidence, not from a model",
+          "mock provider — categories derived deterministically from the evidence, not a model",
       };
     },
   };

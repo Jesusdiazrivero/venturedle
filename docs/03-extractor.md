@@ -19,9 +19,7 @@ npm run extract -- -d data/domains.txt -s 2026-10-01 -o data/companies.json
 #                            mock = NO network at all: Harmonic is faked too (deterministic records from the domain string).
 #                            Use it for tests, demos and to produce a schedule that starts today without any keys.
 #   --model <id>             override the provider's default model
-#   --concurrency <n>        default 3
-#   --no-cache               ignore .cache/ and refetch everything
-#   --dry-run                fetch + extract but do not write --out (still writes rejected.json)
+#                            (concurrency is fixed at 3; there are no other flags — see D13)
 
 npm run extract -- validate data/companies.json      # zod-validate an existing file, exit 1 on failure
 ```
@@ -64,7 +62,7 @@ For each domain, in file order, with bounded concurrency:
 
 ```
 domain ─▶ normalise ─▶ Harmonic fetch ─▶ evidence ─▶ LLM extract ─▶ merge + validate ─▶ record
-                          (cached)                     (cached)           │
+                                                                          │
                                                                           └─▶ rejected.json on failure
 ```
 
@@ -78,7 +76,7 @@ after them:
 ✔ revolut.com       → 2026-10-02  Revolut         ...
 …
 Wrote 98 companies to data/companies.json (2026-10-01 → 2027-01-06). 2 rejected → data/rejected.json
-⚠ Rejections shift the schedule. Fix or remove them in domains.txt and re-run (cache makes it cheap).
+⚠ Rejections shift the schedule. Fix or remove them in domains.txt and re-run.
 ```
 
 ### 1. Harmonic fetch
@@ -100,8 +98,7 @@ domains and an empty output file.
 **Field names must be verified against a live response on the first run.** Harmonic's MCP layer
 returns camelCase (`logoUrl`, `funding.fundingTotal`, `foundingDate.date`); the REST API is
 believed to return snake_case (`logo_url`, `funding.funding_total`, `founding_date.date`). Write
-the mapper as a small `pick(obj, ["logo_url", "logoUrl"])` helper that accepts both, and keep the
-**raw response in the cache** so the mapping can be corrected offline without refetching. Fields we
+the mapper as a small `pick(obj, ["logo_url", "logoUrl"])` helper that accepts both. Fields we
 care about, by intent:
 
 | Intent              | Candidates in Harmonic response                                                            |
@@ -121,9 +118,6 @@ care about, by intent:
 | customer type       | `customer_type` (string or array, e.g. `"B2B"`)                                            |
 
 Fallback logo when Harmonic has none: `https://www.google.com/s2/favicons?domain={domain}&sz=128`.
-
-Cache: `.cache/harmonic/{domain}.json` = `{ fetchedAt, status, body }`. Cached 404s are honoured
-too (re-run with `--no-cache` to retry). `.cache/` is gitignored.
 
 ### 2. Evidence
 
@@ -218,9 +212,6 @@ One exception, and it is the seam the tests use: if `HARMONIC_BASE_URL` is set e
 run the whole pipeline against a fixture server (404s, missing fields, retries) with a mock LLM. A
 normal run never sets that variable, so `--provider mock` stays offline and never spends a credit.
 
-Cache: `.cache/llm/{domain}.{sha256(prompt+schema+model).slice(0,12)}.json`. Changing the prompt,
-taxonomy or model invalidates it automatically.
-
 Retries: one retry on schema-validation failure with the validation error appended to the prompt;
 then `llm_invalid_output`.
 
@@ -266,37 +257,28 @@ hand-edited) and `data/rejected.json`:
 ]
 ```
 
-Re-running with the same inputs is idempotent (cache) and deterministic except for `generatedAt`.
+Re-running with the same inputs produces the same schedule, byte for byte except for `generatedAt`
+and each record's `source.harmonicFetchedAt`. It is not free: there is no cache (D13), so every
+domain is fetched and extracted again.
 
 ## Code layout
 
 ```
 extractor/
   package.json            # scripts.extract = "tsx src/cli.ts"; deps: commander, zod, @langchain/core, @langchain/anthropic, @langchain/openai, @langchain/google-genai, tsx
-  src/
-    cli.ts                # arg parsing, orchestration, logging
-    domains.ts            # read + normalise + dedupe domains file
-    harmonic.ts           # fetchCompany(domain), retries, cache, mock client
-    evidence.ts           # toEvidence(raw): Evidence + toFacts(raw): HarmonicFacts (tolerant field picking)
-    llm.ts                # extract(evidence): Promise<Extraction>, cache, mock provider
-    record.ts             # buildRecord(): merge + CompanySchema, or a rejection reason
-    schedule.ts           # assignDates(records, start)
-    write.ts              # write companies.json + rejected.json
-    cache.ts              # the disk cache both harmonic.ts and llm.ts use
-    models.ts             # default model per provider + provider inference from the env
-    countries.ts          # country name → ISO-2, used only by the mock provider
-    paths.ts              # resolve CLI/env paths against the repo root (INIT_CWD)
-    types.ts              # RejectionReason, Rejection, AbortRunError
-  test/
+  src/                    # five files, and no more without a reason (D13)
+    cli.ts                # the flags, and the exit code. Nothing else.
+    index.ts              # the pipeline: domains → fetch → extract → merge → date → write, plus the log
+    harmonic.ts           # the HTTP client, the offline mock, and toEvidence/toFacts (tolerant field picking)
+    llm.ts                # provider factory, ExtractionSchema, the prompt, the offline mock
+    tools.ts              # the pure parts: paths, domains file, dates, buildRecord, mapPool, writers
+  test/                   # one test file per source file
     fixtures/domains.txt       # the 5-domain file the e2e test and the README use
     fixtures/harmonic/*.json   # 3–4 anonymised real responses (snake_case) — record on first run
     fixture-server.ts          # http.createServer serving fixtures by website_domain
-    domains.test.ts
-    evidence.test.ts
-    harmonic.test.ts
+    tools.test.ts
+    harmonic.test.ts      # the client (retries, 404, abort) and the field picking
     llm.mock.test.ts
-    record.test.ts
-    schedule.test.ts
     cli.e2e.test.ts       # runs the CLI with mock provider + fixture Harmonic server
 ```
 
@@ -305,11 +287,12 @@ by domain, and point `HARMONIC_BASE_URL` at it. Never call the real API in tests
 
 ## Operational notes for the README
 
-- Cost: one Harmonic enrichment credit per new domain, one small LLM call (~1–2k tokens) per
-  domain. 100 domains ≈ cents.
+- Cost: one Harmonic enrichment credit per domain, one small LLM call (~1–2k tokens) per domain,
+  **on every run** — there is no cache (D13). 100 domains ≈ cents.
 - To extend the schedule later, append domains to `domains.txt` and re-run with the **same
-  `--start`**; cached domains are free and their dates are unchanged as long as nothing before them
-  was removed or rejected differently.
+  `--start`**; existing dates are unchanged as long as nothing before them was removed or rejected
+  differently, but the whole file is re-fetched. Re-running a 100-domain schedule to add one
+  company costs 100 credits, so batch your additions.
 - **`data/companies.json` is the answer key with dates attached.** It is gitignored by default so
   a public fork does not publish its own solutions; treat it as deploy-time data (copied to the
   server, backed up with the database). `data/domains.txt` can be committed if you don't mind

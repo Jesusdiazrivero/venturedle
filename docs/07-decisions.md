@@ -220,3 +220,31 @@ non-browser workspace runs (D1). `dotenv` would have been a dependency for a fla
 
 **Seam.** `cli.ts` is the only file that imports `commander`, and `llm.ts` the only one that
 imports LangChain — both replaceable in one file.
+
+---
+
+### D13. No cache; five files; five flags
+
+**Decision.** The extractor has no disk cache, no `--no-cache`, no `--dry-run` and no
+`--concurrency` (it is fixed at 3). `extractor/src/` is five files: `cli.ts` (flags and exit
+code), `index.ts` (the pipeline), `harmonic.ts`, `llm.ts`, `tools.ts` (the pure parts). Adding a
+sixth needs a reason here, the same as a dependency.
+
+**Why.** The first implementation had twelve source files, a two-backend cache keyed by a prompt
+hash, and a streaming in-order log built on a completion cursor — more machinery than a CLI that an
+operator runs a handful of times deserves. The cache was the biggest piece of it and the one that
+paid off least: it only helps when re-running the *same* domains, and its correctness questions
+(honouring a cached 404, invalidating on a prompt or taxonomy change) cost more than the credits it
+saves.
+
+**What it costs.** Every run re-fetches every domain: one Harmonic credit and one LLM call each, so
+appending one company to a 100-domain schedule costs 100 credits. Batch your additions. Re-running
+also changes each record's `source.harmonicFetchedAt`, so the output file is no longer byte-stable
+across runs; the *schedule* still is.
+
+**Rejected.** Caching only Harmonic (half the machinery for most of the benefit, but still the
+404/invalidations question); `--dry-run` (that is `-o /tmp/x.json`); a `--concurrency` flag (nobody
+tunes it, and 3 is polite to Harmonic's rate limit).
+
+**Seam.** `harmonic.ts` and `llm.ts` each expose one client interface with one method. A cache is a
+decorator around either, in one file, if re-running ever becomes a real workflow.
