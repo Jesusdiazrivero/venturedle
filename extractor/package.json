@@ -1,0 +1,14 @@
+{
+  "name": "@venturedle/extractor",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "extract": "tsx --env-file-if-exists=../.env src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@venturedle/shared": "*"
+  }
+}

@@ -1,0 +1,17 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/.env
+.env
+.cache
+coverage
+docs
+data/*.db*
+data/rejected.json
+*.md
+!README.md
+
+# the extractor never runs in the image; its package.json is kept so `npm ci` sees the workspace
+extractor/*
+!extractor/package.json
