@@ -367,3 +367,36 @@ inside `StrictMode` precisely to prove the second call does not happen.
 **Rejected.** A router library (two routes); a state library (`PlayState` from the server *is* the
 state); `@testing-library/jest-dom` (the four tests assert on text and properties, so the extra
 matchers earn nothing).
+
+---
+
+### D17. Phase 5 deviations: a narrower build install, and idempotent GCP scripts
+
+**Decision.** Three small departures from the sketches in `06-deployment.md`, all in the same
+direction — do less, and be safe to re-run.
+
+**The build stage installs two workspaces, not all four.** `06` wrote `npm ci --workspaces
+--include-workspace-root`, which pulls the extractor's four LangChain packages into a stage whose
+only job is `vite build`. `npm ci --workspace shared --workspace frontend --include-workspace-root`
+produces a byte-identical `frontend/dist` and skips the download. All four manifests are still
+copied first, because that is what the lockfile check needs — that part of the sketch was the
+point. The runtime stage already installed a subset this way.
+
+**`create-vm.sh` guards with `describe`, not `|| true`.** The sketch ended three commands with
+`|| true` so a re-run would not abort. That also swallows a real failure — a bad zone, a quota
+refusal, no permission — and leaves the script printing "VM ready" over the top of it. Each step
+now asks whether the thing exists and creates it only if it does not, so a genuine error still
+stops the run. (`disks add-resource-policies` keeps the fallback: attaching a policy twice is the
+one case where the error *is* the success condition and there is no cheap way to ask first.)
+
+**`deploy.sh` makes the remote directories before copying.** `06` flagged that `scp --recurse` on
+a file path flattens, and suggested creating the directory first *or* a second copy; it needs both
+— the second `scp` still has nowhere to land. One `ssh mkdir -p` covers `data/` and `extractor/`
+in the same breath, and it also means the script works against a VM whose startup script has not
+finished yet.
+
+**Not deviations, just choices the docs left open.** The README screenshot is the play view after
+three guesses against the example schedule (`docs/screenshot.png`); a solved board would have put
+an answer on the front page of the repo. `deploy/.env` is a required `env_file` rather than an
+optional one, because a missing file that silently yields `AUTH_MODE=anonymous` on a box you meant
+to lock to a Workspace domain is the wrong failure.

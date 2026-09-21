@@ -20,8 +20,7 @@ jobs:
       - run: npm run build
 
   docker:
-    # The Dockerfile arrives in Phase 5; until then this job is a no-op rather than a red X.
-    if: github.ref == 'refs/heads/main' && hashFiles('Dockerfile') != ''
+    if: github.ref == 'refs/heads/main'
     needs: check
     runs-on: ubuntu-latest
     steps:

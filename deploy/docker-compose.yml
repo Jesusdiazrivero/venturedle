@@ -1,0 +1,32 @@
+# Production (and production-like local) run: the app plus Caddy for TLS.
+#   cd deploy && cp .env.example .env && docker compose up -d --build
+# `.env` drives both services — Compose reads it for ${DOMAIN}, the app gets it as env_file.
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: venturedle:latest
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # The only state: companies.json (the schedule) and venturedle.db, on the host.
+      - ../data:/data
+    expose: ["8080"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      # A hostname gets an automatic Let's Encrypt certificate; ":80" is plain HTTP.
+      DOMAIN: ${DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
