@@ -115,8 +115,8 @@ describe("sessions", () => {
 
 describe("google mode", () => {
   const IDENTITIES = {
-    "good-token": { sub: "1234", name: "Jess Rivero", hd: "acurio.vc" },
-    "outsider-token": { sub: "9999", name: "Someone Else", hd: "example.com" },
+    "good-token": { sub: "1234", name: "Jess Rivero", hd: "example.com" },
+    "outsider-token": { sub: "9999", name: "Someone Else", hd: "example.org" },
     "no-domain-token": { sub: "5555", email: "solo@gmail.com" },
   };
 
@@ -139,7 +139,7 @@ describe("google mode", () => {
   }
 
   it("exchanges a verified id token for a session, and resolves to the same player next time", async () => {
-    const t = googleApp("acurio.vc");
+    const t = googleApp("example.com");
     const first = (await (
       await exchange(t, "good-token")
     ).json()) as AuthResponse;
@@ -173,7 +173,7 @@ describe("google mode", () => {
   });
 
   it("403s an account outside GOOGLE_ALLOWED_DOMAIN, including one with no domain at all", async () => {
-    const t = googleApp("acurio.vc");
+    const t = googleApp("example.com");
     const outsider = await exchange(t, "outsider-token");
     expect(outsider.status).toBe(403);
     expect(await outsider.json()).toMatchObject({ error: "forbidden_domain" });

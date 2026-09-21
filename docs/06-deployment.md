@@ -204,7 +204,7 @@ Authorised JavaScript origins: `https://$DOMAIN`, plus `http://localhost` **and*
 not accepted, so google mode cannot be smoke-tested on the VM's IP with `DOMAIN=:80` — use
 anonymous mode for that). No redirect URI is needed: the GIS button/One Tap callback returns the ID
 token to the page. Put the client id in `deploy/.env` and, for a Workspace lock,
-`GOOGLE_ALLOWED_DOMAIN=acurio.vc`. Nothing else on GCP is required.
+`GOOGLE_ALLOWED_DOMAIN=example.com`. Nothing else on GCP is required.
 
 ## Other targets (not documented in detail, but the design keeps them one step away)
 

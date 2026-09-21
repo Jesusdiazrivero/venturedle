@@ -119,7 +119,7 @@ exchanges a Google ID token for the same kind of session token once. The rest of
 sees a bearer token.
 
 **Why.** Anyone can deploy the anonymous mode with zero configuration. Teams that want "real"
-identities (a Workspace-locked internal game, as at Acurio) flip one env var and set a client id.
+identities (a Workspace-locked internal game for one team) flip one env var and set a client id.
 Exchanging the ID token once avoids v1's hourly re-auth and keeps `google-auth-library` out of the
 hot path.
 

@@ -81,14 +81,14 @@ describe("public endpoints", () => {
       auth: {
         mode: "google",
         clientId: "client-123",
-        allowedDomain: "acurio.vc",
+        allowedDomain: "example.com",
         verify: fakeGoogleVerifier({}),
       },
     });
     expect(await (await google.request("/api/config")).json()).toEqual({
       authMode: "google",
       googleClientId: "client-123",
-      googleAllowedDomain: "acurio.vc",
+      googleAllowedDomain: "example.com",
     } satisfies AppConfig);
   });
 

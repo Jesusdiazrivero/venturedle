@@ -30,7 +30,7 @@ which is where `Company` lives.
 1. **Onboarding** — shown when there is no session token. Anonymous mode: a single nickname field
    and a "Play" button. Google mode: the Google Identity Services button (script loaded on demand
    from `accounts.google.com/gsi/client`; client id from `/api/config`). `forbidden_domain` is
-   shown in plain words using `AppConfig.googleAllowedDomain` ("Sign in with your @acurio.vc
+   shown in plain words using `AppConfig.googleAllowedDomain` ("Sign in with your @example.com
    account"); `invalid_token` shows a generic "Sign-in failed, try again".
 2. **Play** (`#/`) — the puzzle. States:
    - `no puzzle today`: friendly empty state with the countdown to the next UTC midnight (the next
