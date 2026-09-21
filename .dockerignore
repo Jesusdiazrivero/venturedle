@@ -7,6 +7,8 @@ node_modules
 .cache
 coverage
 docs
+e2e
+test-results
 data/*.db*
 data/rejected.json
 *.md

@@ -9,14 +9,31 @@ import { Header } from "./Header.js";
 import { Leaderboard } from "./Leaderboard.js";
 import { Onboarding } from "./Onboarding.js";
 import { Play } from "./Play.js";
-import { useHashRoute } from "./hooks.js";
+import { useCountdown, useHashRoute } from "./hooks.js";
 import { getToken, setToken, subscribeToken } from "./session.js";
+
+/** How often to re-ask for today's puzzle once the countdown has run out. */
+const ROLLOVER_POLL_MS = 5_000;
 
 function Game({ config }: { config: AppConfig }) {
   const route = useHashRoute();
   const [player, setPlayer] = useState<Player | null>(null);
   const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Midnight UTC turns the puzzle over under an open tab. Our clock can be ahead of the server's,
+  // so asking once at zero can hand back the same day — keep asking until the answer moves on,
+  // which it announces by a `nextPuzzleAt` the countdown is no longer at zero for.
+  const nextPuzzleAt = puzzle?.nextPuzzleAt;
+  const rolledOver = useCountdown(nextPuzzleAt) === 0;
+
+  useEffect(() => {
+    if (!nextPuzzleAt || !rolledOver) return;
+    const ask = () => void api.getPuzzle().then(setPuzzle, () => undefined);
+    ask();
+    const timer = setInterval(ask, ROLLOVER_POLL_MS);
+    return () => clearInterval(timer);
+  }, [nextPuzzleAt, rolledOver]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +79,12 @@ function Game({ config }: { config: AppConfig }) {
         }
         onSignOut={() => void signOut()}
       />
-      {route === "/leaderboard" ? <Leaderboard /> : <Play puzzle={puzzle} />}
+      {route === "/leaderboard" ? (
+        <Leaderboard />
+      ) : (
+        // Keyed by date: a rollover replaces the board rather than reusing yesterday's grid.
+        <Play key={puzzle.date} puzzle={puzzle} />
+      )}
     </>
   );
 }

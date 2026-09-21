@@ -18,13 +18,15 @@
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm run typecheck && npm run build -w frontend",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:e2e": "playwright test -c e2e",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e",
     "extract": "npm run extract -w extractor --",
     "example-schedule": "npm run example-schedule -w extractor --",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.6",
     "concurrently": "^9.1.2",
     "prettier": "^3.4.2",

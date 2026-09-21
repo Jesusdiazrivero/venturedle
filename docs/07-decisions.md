@@ -400,3 +400,46 @@ three guesses against the example schedule (`docs/screenshot.png`); a solved boa
 an answer on the front page of the repo. `deploy/.env` is a required `env_file` rather than an
 optional one, because a missing file that silently yields `AUTH_MODE=anonymous` on a box you meant
 to lock to a Workspace domain is the wrong failure.
+
+---
+
+### D18. Phase 6: the e2e test is a deploy smoke test, and it replaces the `docker build` CI job
+
+**Decision.** Four small things, one of which is a new dev dependency and one of which changes CI.
+
+**`@playwright/test` (dev) and an `e2e/` directory that is not a workspace.** Three files —
+`playwright.config.ts`, `smoke.spec.ts`, `tsconfig.json` — outside the workspace list on purpose:
+a fifth workspace would join `npm test --workspaces`, and this test needs a server that is already
+up. It runs via `npm run test:e2e`, and the root `typecheck` gained `&& tsc -p e2e` so the spec is
+held to the same `strict` as everything else. Nothing reaches the image: the Dockerfile copies
+named directories, and `--omit=dev` keeps Playwright out of the runtime stage.
+
+**The spec does not start the stack.** No Playwright `webServer` block; it points at
+`E2E_BASE_URL` (default `http://localhost`). Starting compose from the test would have made the
+happy path one command, but the second half of what this test is for is pointing it at a box that
+is already deployed — `E2E_BASE_URL=https://your.host npm run test:e2e` — and a `webServer` that
+"reuses an existing server" makes "which server did I just test?" a question. Like
+`backend/scripts/smoke.sh`, it reads the answer from `data/companies.json`, which is what makes it
+a smoke test rather than a game.
+
+**CI: the `e2e` job replaces the `docker` job.** The old job ran `docker build .` on `main` and
+asserted only that the image builds. The new one builds the same image through
+`deploy/docker-compose.yml`, waits for `/api/health`, plays a whole game through Caddy and the
+SPA, and runs on every pull request — strictly more coverage than the build it replaces, for one
+extra minute. `check` also gained `npm run extract -- validate data/companies.example.json`: the
+committed schedule is both the keyless demo and the extractor's golden file, and a schema break
+there breaks `npm run dev` for everyone.
+
+**Rollover is `App`'s job, and it polls.** The countdown lives in `App` (which owns `puzzle`),
+not in `Play` (which is handed one), and reaching zero re-fetches `puzzle/today` every five
+seconds rather than once: the browser's clock can be ahead of the server's, so a single ask at
+`00:00:00` can legitimately hand back the day that just ended. The new `nextPuzzleAt` stops the
+poll by itself — there is no separate "did it work" flag. `Play` is keyed by `puzzle.date`, so
+the remount is what clears the board; no view has to reset its own state. One known dev-only
+edge: with `DEV_TODAY` pinned, the server's date never moves, so after the real midnight the poll
+keeps asking every five seconds. Deriving `nextPuzzleAt` from the pinned date instead would put it
+in the past and poll from the first render, which is worse; a production server does flip.
+
+**Already done in Phase 4, not re-done here:** the flag-emoji fallback (`GuessGrid`'s cached canvas
+measurement), picker keyboard navigation and the `aria-label`s were built with the views rather
+than bolted on afterwards, which is where they belonged.

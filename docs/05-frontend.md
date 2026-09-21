@@ -96,9 +96,11 @@ what makes reload/resume trivial. A `401 unauthorized` on any authenticated call
 and returns to Onboarding (the session was revoked or the database was reset); a guess after a
 solve simply returns the same `PlayState`, so there is nothing to special-case.
 
-Midnight rollover while the tab is open: `useCountdown` reaching zero should trigger a refetch of
-`puzzle/today` and `results/today` (and clear the grid). Not built yet — it is on the Phase 6 list
-in `08-build-plan.md`; today the countdown runs to `00:00` and a reload picks up the new puzzle.
+Midnight rollover while the tab is open: `App` holds the countdown on `puzzle.nextPuzzleAt`, and
+when it reaches zero it re-fetches `puzzle/today` every five seconds until the server's date moves
+on (the browser clock can be ahead of the server's, so one ask at zero can hand back the same day).
+`Play` is keyed by `puzzle.date`, so the new day remounts it: fresh grid, fresh `results/today`,
+fresh `start`.
 
 ## Visual notes
 
@@ -140,5 +142,9 @@ routes keyed by `"<METHOD> <path>"` and records the calls; an unrouted request f
 - Picker excludes guessed companies, matches on the domain, and picks the highlighted match on Enter.
 - Leaderboard toggles change the query string, highlight `isMe`, and show the empty state.
 
-End-to-end (optional, phase 6): one Playwright script against `docker compose up` that creates a
-player, guesses the fixture answer and asserts the share text — it doubles as a deploy smoke test.
+- Rollover re-fetches the puzzle at midnight and does not reuse yesterday's board (fake timers,
+  a server whose day turns over one poll later than the browser's).
+
+End-to-end: `e2e/smoke.spec.ts`, one Playwright test against a running stack (`docker compose up`,
+or a deployed box via `E2E_BASE_URL`) that creates a player, guesses wrong, guesses the scheduled
+answer and asserts the share text. It is not part of `npm test` — `npm run test:e2e`.

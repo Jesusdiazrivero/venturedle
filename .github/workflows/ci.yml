@@ -18,11 +18,46 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # The committed schedule is the keyless demo and the extractor's own golden file: if it stops
+      # satisfying the schema, every `npm run dev` and every `docker compose up` is broken.
+      - run: npm run extract -- validate data/companies.example.json
 
-  docker:
-    if: github.ref == 'refs/heads/main'
+  # Builds the image the way a deployment does and plays one real game through it — this is the
+  # `docker build` check and the Phase 5 acceptance run in one.
+  e2e:
     needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build .
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # A keyless schedule starting today, so the container has a puzzle for the real UTC date.
+      - run: npm run example-schedule
+      - name: Start the stack
+        working-directory: deploy
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+          for _ in $(seq 60); do
+            curl -fsS http://localhost/api/health && exit 0
+            sleep 2
+          done
+          echo "the stack never became healthy" >&2
+          docker compose logs
+          exit 1
+
+      - run: npm run test:e2e
+
+      - name: Container logs
+        if: failure()
+        working-directory: deploy
+        run: docker compose logs
+      - name: Stop the stack
+        if: always()
+        working-directory: deploy
+        run: docker compose down -v

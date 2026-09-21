@@ -83,6 +83,18 @@ certificate automatically; `:80` is plain HTTP for a local or IP-only smoke test
 
 Replacing `data/companies.json` on the host is picked up within 30 seconds, no restart.
 
+Is it really working? `npm run test:e2e` plays one whole game in a real browser against whatever
+is running — a new player, a wrong guess, the answer, the share text:
+
+```bash
+npx playwright install chromium                          # once
+npm run test:e2e                                         # → http://localhost
+E2E_BASE_URL=https://your.host npm run test:e2e          # or against the deployed box
+```
+
+It reads the answer out of `data/companies.json`, so that file has to be the schedule the server
+is serving (`COMPANIES_FILE=… npm run test:e2e` if it lives elsewhere).
+
 ## Deploy to GCP
 
 A single `e2-micro` Compute Engine VM running Docker. In `us-west1`, `us-central1` or `us-east1`
@@ -135,6 +147,7 @@ sudo docker compose exec app node -e \
 | `backend/`   | Hono API + SQLite (`node:sqlite`); also serves the built SPA                     |
 | `frontend/`  | Vite + React SPA                                                                 |
 | `shared/`    | types, enums, sector taxonomy, zod schemas, pure scoring                         |
+| `e2e/`       | one Playwright smoke test: a whole game against a running deployment             |
 
 The answer never reaches the browser before it is found: the seven-field `Company` type is
 exported only from `@venturedle/shared/server`, which the SPA cannot import, and the scoring
