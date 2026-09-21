@@ -37,6 +37,7 @@ export function createApp(config: Config): { app: Hono<AppEnv>; deps: Deps } {
     }),
   );
 
+  // Middleware to ensure that we always have the latest companies.json loaded.
   app.use("/api/*", async (_c, next) => {
     deps.companies.maybeReload(config.now().getTime());
     await next();
@@ -65,18 +66,19 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  const config = loadConfig(process.env);
-  let started;
+  // A bad env var, a missing companies.json and an unwritable DATA_DIR are all the same kind of
+  // event to an operator — one line saying what is wrong, then exit 1. No stack traces at boot.
   try {
-    started = createApp(config);
+    const config = loadConfig(process.env);
+    const { app, deps } = createApp(config);
+    serve({ fetch: app.fetch, port: config.port });
+    console.log(
+      `venturedle listening on :${config.port} — auth=${config.auth.mode} ` +
+        `companies=${deps.companies.count()} today=${today(config)}` +
+        (config.devToday ? " (DEV_TODAY)" : ""),
+    );
   } catch (err) {
     console.error(`boot failed: ${(err as Error).message}`);
     process.exit(1);
   }
-  serve({ fetch: started.app.fetch, port: config.port });
-  console.log(
-    `venturedle listening on :${config.port} — auth=${config.auth.mode} ` +
-      `companies=${started.deps.companies.count()} today=${today(config)}` +
-      (config.devToday ? " (DEV_TODAY)" : ""),
-  );
 }

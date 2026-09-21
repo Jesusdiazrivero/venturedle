@@ -45,7 +45,7 @@ interface GuessRow {
 }
 
 /** The clock starts when the puzzle is shown (D9), so this is a no-op on a play that exists. */
-function ensurePlay(
+function ensurePlayStarted(
   db: Db,
   playerId: string,
   date: string,
@@ -129,7 +129,7 @@ export function startPlay(
   date: string,
   puzzle: Puzzle,
 ): PlayState {
-  ensurePlay(deps.db, playerId, date, puzzle, deps.config.now());
+  ensurePlayStarted(deps.db, playerId, date, puzzle, deps.config.now());
   return buildPlayState(deps, playerId, date, puzzle.number);
 }
 
@@ -152,7 +152,7 @@ export function recordGuess(
   const now = deps.config.now();
 
   const written = deps.db.transaction<{ duplicate: boolean }>(() => {
-    ensurePlay(deps.db, playerId, date, puzzle, now); // auto-start: the clock starts now
+    ensurePlayStarted(deps.db, playerId, date, puzzle, now); // auto-start: the clock starts now
     const play = deps.db.get<PlayRow>(
       "SELECT started_at, solved_at, guess_count FROM plays WHERE player_id = ? AND date = ?",
       playerId,

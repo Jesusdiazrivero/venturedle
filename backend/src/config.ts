@@ -53,7 +53,7 @@ function fail(message: string): never {
   throw new Error(`invalid configuration: ${message}`);
 }
 
-function authFrom(env: NodeJS.ProcessEnv): AuthConfig {
+function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
   const mode = env.AUTH_MODE?.trim() || "anonymous";
   if (mode === "anonymous") return { mode };
   if (mode !== "google") {
@@ -99,7 +99,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     ),
     staticDir: resolve(env.STATIC_DIR?.trim() || "frontend/dist"),
     ...(publicUrl ? { publicUrl } : {}),
-    auth: authFrom(env),
+    auth: loadAuthConfig(env),
     ...(devToday ? { devToday } : {}),
     now: () => new Date(),
   };
