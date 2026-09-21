@@ -10,7 +10,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@venturedle/shared": "*",
-    "tsx": "^4.19.2"
+    "google-auth-library": "^11.1.0",
+    "hono": "^4.13.8",
+    "tsx": "^4.19.2",
+    "zod": "^3.24.1"
   }
 }

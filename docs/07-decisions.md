@@ -282,3 +282,44 @@ the pipeline, and the LangChain call itself is covered by a real run).
 
 **Seam.** `Clients` in `index.ts`. Anything satisfying `HarmonicClient` and `LlmClient` can be
 handed to `extract`.
+
+---
+
+### D15. The backend's file list
+
+**Decision.** `backend/src/` is twelve files plus `schema.sql`, not the fourteen `04-backend.md`
+first sketched. The changes, each an application of the simplicity rules in `CLAUDE.md`:
+
+- `src/db.ts` + `src/schema.sql` instead of `src/db/{db,schema.sql}` — two files do not need a
+  directory, and `db/db.ts` stutters. `openDb(file)` opens *and* applies the schema: a database you
+  have to remember to `migrate()` is a second step every caller can forget (rule 4).
+- `auth/{middleware,anonymous,google}.ts` → one `src/auth.ts`. All three are the same two tables;
+  splitting them produced three files averaging thirty lines (rule 1).
+- `routes/auth.ts` + `routes/me.ts` → `routes/identity.ts`. `/api/auth/*` and `/api/me` are the
+  same question — who is calling — and `me` was two handlers.
+- `config.ts` also holds `Deps` and the Hono `AppEnv`. A ten-line `types.ts` imported by everything
+  is not worth the file; both types describe "what the app was configured with".
+- `createApp(config)` returns `{ app, deps }` rather than just the app, so `server.ts` can log the
+  boot line. A factory that builds *and* logs is doing two jobs (rule 4); the tests destructure
+  `{ app }` and ignore the rest.
+
+**Two other shapes worth recording.**
+
+`Config.auth` is a discriminated union that carries the Google verifier
+(`{ mode: "google"; clientId; allowedDomain?; verify }`), so tests inject a fake verifier without
+an optional parameter that exists only for tests (rule 3), and anonymous mode cannot accidentally
+reach `google-auth-library`. `loadConfig` is the only thing that builds the real verifier, and
+`server.ts` is the only thing that calls `loadConfig`.
+
+`DEV_TODAY` pins the **date**, not the clock: `config.now` stays a real `() => Date` and
+`today(config)` is `config.devToday ?? utcDate(config.now())`. Elapsed times therefore stay honest
+in dev, and tests move a fake `now` and a pinned date independently.
+
+**Dependencies.** `hono`, `@hono/node-server`, `google-auth-library` and `tsx` per D5/D6/D1.
+`zod` is declared in `backend/package.json` rather than borrowed from `shared`'s install: the
+backend imports it directly (request bodies are validated at the edge), and a package should
+declare what it imports. It is the same version and the same install — nothing new ships.
+
+**No per-request log line.** The app logs boot, schedule reloads, reload failures and 500s — one
+line per *event*, as the convention says. Request logging is Caddy's job in production (D7), and a
+line per request would have buried the interesting ones and the test output alike.

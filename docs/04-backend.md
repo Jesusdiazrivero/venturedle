@@ -46,7 +46,8 @@ unwritable `DATA_DIR`, `DEV_TODAY` in production.
 
 ## SQLite schema
 
-Applied idempotently at boot (`CREATE TABLE IF NOT EXISTS …`) from `backend/src/db/schema.sql`. A
+Applied idempotently at boot (`CREATE TABLE IF NOT EXISTS …`) from `backend/src/schema.sql`, by
+`openDb` itself — there is no separate `migrate()` step for a caller to forget. A
 `meta(key, value)` table holds `schema_version`; bumping it and adding an `ALTER` block is the whole
 migration story.
 
@@ -212,8 +213,9 @@ ORDER BY avg_guesses ASC, days DESC
 LIMIT 50;
 ```
 
-`me`: if the caller is authenticated and not in the top 50, run the same query with a window
-function (`RANK() OVER (...)`) filtered to their id. Round averages to 2 decimals for guesses and
+`me`: if the caller is authenticated and not in the top 50, run the same query filtered to their
+id. Both queries wrap the `ORDER BY` above in `RANK() OVER (...)` — the list as well as `me` — so
+the two agree about ties. Round averages to 2 decimals for guesses and
 to whole ms for time in the DTO (`guesses`, `elapsedMs`). Leaderboards are cheap at this scale; no
 caching in v2.
 
@@ -225,17 +227,22 @@ class CompanyIndex {
   byId(id): Company | undefined;
   byDate(date): { company: Company; number: number } | undefined;
   lite(): CompanyLite[]; // sorted by name, memoised
-  maybeReload(): void; // stat() at most every 30 s; reload if mtime changed; on parse error keep old index and log
+  count(): number;
+  maybeReload(nowMs): void; // stat() at most every 30 s; reload if mtime changed; on parse error keep old index and log
 }
 ```
 
 ## Static serving
 
-When `STATIC_DIR` exists: `@hono/node-server/serve-static` for real files (long `Cache-Control`
-for hashed assets via `onFound`), then a catch-all that serves `index.html` for any non-`/api`
-path. Test this with an **absolute** `STATIC_DIR` (as in Docker) — older `serve-static` versions
-mishandled absolute roots. When the directory does not exist (dev), `/` returns a small JSON hint.
-The frontend dev server proxies `/api` to `:8080`.
+When `STATIC_DIR` exists: `@hono/node-server/serve-static` for real files, then a catch-all that
+serves `index.html` for any non-`/api` path. Test this with an **absolute** `STATIC_DIR` (as in
+Docker) — older `serve-static` versions mishandled absolute roots. When the directory does not
+exist (dev), `/` returns a small JSON hint. The frontend dev server proxies `/api` to `:8080`.
+
+Cache headers are set by middleware *before* `serveStatic` runs (`no-cache` for everything, a year
+for `/assets/*`, `no-cache` again on the SPA fallback so a missing hashed asset cannot pin
+`index.html` under that name). `serveStatic`'s `onFound` hook fires after the `Response` has been
+built, so headers set there are silently dropped.
 
 ## Code layout
 
@@ -247,38 +254,39 @@ possible future replacement — see `07-decisions.md`, D1.)
 
 ```
 backend/
-  package.json          # deps: hono, @hono/node-server, google-auth-library, tsx; zod via shared; dev: vitest, typescript
+  package.json          # deps: hono, @hono/node-server, google-auth-library, zod, tsx; dev: vitest, typescript
+  scripts/smoke.sh      # plays one game against a running server and prints the share text
   src/
-    server.ts           # createApp(config) + listen when main
-    config.ts           # env → Config, with validation
-    db/
-      schema.sql
-      db.ts             # open(), migrate(), typed query helpers
+    server.ts           # createApp(config) → { app, deps }; loadConfig + listen when main
+    config.ts           # env → Config, with validation; also Deps and the Hono AppEnv
+    schema.sql
+    db.ts               # openDb() (opens + applies the schema), run/get/all/transaction
     companies.ts        # CompanyIndex
-    auth/
-      middleware.ts     # bearer → player
-      anonymous.ts
-      google.ts
+    auth.ts             # players, sessions, bearer middleware, the Google verifier
+    play.ts             # the guess transaction + buildPlayState
+    time.ts             # utcDate(), nextUtcMidnight(), today(config)
+    static.ts
     routes/
       public.ts         # health, config, companies, puzzle
-      auth.ts
-      me.ts
+      identity.ts       # /api/auth/* and /api/me, plus the auth rate limit
       results.ts        # start, guesses, state
       leaderboard.ts
-    play.ts             # the guess transaction + buildPlayState
-    time.ts             # utcDate(), nextUtcMidnight()
-    static.ts
   test/
-    helpers.ts          # createApp with :memory: db + fixture companies + fake clock
+    helpers.ts          # createApp with :memory: db + fixture companies + fake clock + fake Google verifier
+    app.test.ts         # loadConfig fail-fast, public endpoints, COOP, /api 404, static serving
     auth.test.ts
     results.test.ts     # start idempotency, guess flow, already_guessed, guess-after-solve is a no-op 200, no_puzzle_today, collision case, history survives companies.json edits
     leaderboard.test.ts # tie-breaks, me-outside-top-50
     reload.test.ts      # mtime reload keeps old index on bad file
 ```
 
-Tests run against `new DatabaseSync(":memory:")` and a fixture `companies.json` with three
-companies on three consecutive dates; the clock is injectable (`config.now: () => Date`) so
-"today" is deterministic. Use `app.request("/api/…", { headers })` — no ports, no supertest.
+The file list is shorter than it first looks because the three `auth/` files and the `auth`/`me`
+routes each collapsed into one — see D15.
+
+Tests run against `new DatabaseSync(":memory:")` and a fixture `companies.json` with four
+companies on four consecutive dates (the fourth is a seven-tuple twin of the second); the clock is
+injectable (`config.now: () => Date`) so "today" is deterministic. Use
+`app.request("/api/…", { headers })` — no ports, no supertest.
 
 ## Security posture (proportionate)
 
