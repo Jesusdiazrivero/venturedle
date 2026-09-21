@@ -323,3 +323,47 @@ declare what it imports. It is the same version and the same install — nothing
 **No per-request log line.** The app logs boot, schedule reloads, reload failures and 500s — one
 line per *event*, as the convention says. Request logging is Caddy's job in production (D7), and a
 line per request would have buried the interesting ones and the test output alike.
+
+---
+
+### D16. The frontend is twelve flat modules, and `formatElapsed` moves to `shared`
+
+**Decision.** `frontend/src/` is twelve modules and one stylesheet, flat — no `views/` or
+`components/` directories — rather than the eighteen files `05-frontend.md` sketched. What merged,
+each an application of the simplicity rules in `CLAUDE.md`:
+
+- `hooks/{useHashRoute,useCountdown,useElapsed}.ts` → one `hooks.ts`. Three one-function modules
+  with one caller each (rule 1).
+- `Cell.tsx` → inside `GuessGrid.tsx`; the flag-emoji helper goes with it. A cell is only ever
+  rendered by the grid, and the two read as one component (rule 9).
+- `StatusBar.tsx` and `WinPanel.tsx` → inside `Play.tsx`. The status bar was four lines; the win
+  panel is the solved state of the play view and shares nothing with any other view.
+- `NicknameForm.tsx` → inside `Onboarding.tsx` for the sign-in form and inside `Header.tsx` for the
+  rename. They looked like one component and are not: one creates a player and one renames it, with
+  different buttons, errors and submit handlers. A shared form would have taken more props than it
+  saved lines.
+- `LeaderboardTable.tsx` → inside `Leaderboard.tsx`; it is the view.
+- `views/` + `components/` → one directory. Twelve files do not need a taxonomy, and the two that
+  are shared (`Header`, `GoogleButton`) would have made the split arbitrary anyway.
+
+`GoogleButton.tsx` stays its own file: loading a third-party script once, keeping GIS from
+re-initialising on every render, and never touching the network in anonymous mode is genuinely
+subtle, and it is the one place the SPA talks to something that is not our backend.
+
+**`formatElapsed` moves to `shared/src/format.ts`.** The running clock, the countdown, the solved
+time and the share-text header must all agree, and `shared/src/index.ts` may not re-export anything
+from `scoring.ts` (`test/entrypoints.test.ts` enforces that, because that is what keeps `Company`
+out of the SPA). A four-line file is the cheapest way to have one formatter instead of two.
+
+**The session token lives in a module-level store**, not in `useState`: `api.ts` has to clear it
+from any call that 401s, and `App` subscribes with `useSyncExternalStore`. That is what makes "the
+session was revoked" a one-line path — clear the token, the app re-renders into Onboarding — rather
+than an error threaded back through every view.
+
+**`POST /results/today/start` is fired once per date, guarded by a ref**, not by an effect that
+happens to run once: React 18 StrictMode double-invokes effects in dev, and the test renders `Play`
+inside `StrictMode` precisely to prove the second call does not happen.
+
+**Rejected.** A router library (two routes); a state library (`PlayState` from the server *is* the
+state); `@testing-library/jest-dom` (the four tests assert on text and properties, so the extra
+matchers earn nothing).

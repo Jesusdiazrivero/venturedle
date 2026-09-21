@@ -15,6 +15,7 @@ import {
   HEADCOUNT_BUCKETS,
   bucketOf,
 } from "./enums.js";
+import { formatElapsed } from "./format.js";
 
 function setEquals<T>(a: readonly T[], b: readonly T[]): boolean {
   if (a.length !== b.length) return false;
@@ -137,18 +138,6 @@ const EMOJI: Record<CellFeedback["color"], string> = {
   yellow: "🟨",
   grey: "⬜",
 };
-
-/** `mm:ss`, or `h:mm:ss` once past an hour. */
-export function formatElapsed(elapsedMs: number): string {
-  const total = Math.max(0, Math.floor(elapsedMs / 1000));
-  const seconds = total % 60;
-  const minutes = Math.floor(total / 60) % 60;
-  const hours = Math.floor(total / 3600);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return hours > 0
-    ? `${hours}:${pad(minutes)}:${pad(seconds)}`
-    : `${pad(minutes)}:${pad(seconds)}`;
-}
 
 export function buildShareText(args: {
   number: number;

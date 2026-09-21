@@ -1,14 +1,14 @@
 # 05 — Frontend
 
 A Vite + React 18 SPA in TypeScript. No router library, no state library, no UI kit, no CSS
-framework: plain CSS with custom properties, a hand-rolled `useApi` hook, and three views switched
-by a tiny hash router (`#/`, `#/leaderboard`). The v1 look (Wordle-ish grid, dark-mode aware) is
-kept; v1's `styles.css`, `GuessGrid.tsx` and `CompanyPicker.tsx` are good starting points to port.
+framework: plain CSS with custom properties, hand-rolled `fetch` wrappers, and three views switched
+by a tiny hash router (`#/`, `#/leaderboard`). The v1 look — Wordle-ish grid, dark mode following
+the OS — is kept.
 
 Dependencies: `react`, `react-dom`. Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `vitest`,
-`@testing-library/react`, `jsdom`. Nothing else. The SPA imports from `@venturedle/shared` (the
-client entry: enums, `COLUMN_DEFS`, `CompanyLite`, DTOs) and never from `@venturedle/shared/server`,
-which is where `Company` lives.
+`@testing-library/react`, `jsdom`. Nothing else — no router, no state library, no `jest-dom`. The
+SPA imports from `@venturedle/shared` (the client entry: enums, `COLUMN_DEFS`, `CompanyLite`, DTOs)
+and never from `@venturedle/shared/server`, which is where `Company` lives.
 
 ## Views
 
@@ -54,29 +54,24 @@ which is where `Company` lives.
 ```
 frontend/src/
   main.tsx               # mount
-  App.tsx                # loads /api/config; decides Onboarding vs Shell; hash routing
-  api.ts                 # typed fetch wrappers, bearer injection, ApiError → thrown Error with .code
-  session.ts             # get/set/clear token in localStorage (key: "venturedle.token")
-  hooks/
-    useHashRoute.ts
-    useCountdown.ts      # to a target ISO timestamp, 1 s tick
-    useElapsed.ts        # from startedAt, 1 s tick; frozen when solvedAt set
-  views/
-    Onboarding.tsx
-    Play.tsx
-    Leaderboard.tsx
-  components/
-    Header.tsx
-    CompanyPicker.tsx    # typeahead over CompanyLite[]; excludes guessed ids; Enter picks first match; ↑/↓ to move
-    GuessGrid.tsx        # column-driven from COLUMN_DEFS (shared); newest guess on top; staggered reveal animation
-    Cell.tsx             # color + arrow + displayValue; hqCountry renders flag emoji from ISO-2
-    StatusBar.tsx
-    WinPanel.tsx
-    LeaderboardTable.tsx
-    NicknameForm.tsx
-    GoogleButton.tsx     # GIS wrapper; renders nothing in anonymous mode
+  App.tsx                # loads /api/config; Onboarding vs game; hash routing; header data (me, puzzle)
+  api.ts                 # typed fetch wrappers, bearer injection, ApiError with .code; clears the token on 401
+  session.ts             # the token in localStorage (key: "venturedle.token") as an external store
+  hooks.ts               # useHashRoute; useCountdown (1 s tick to an ISO target); useElapsed (frozen once solved)
+  Onboarding.tsx         # nickname form (anonymous) or the Google button; wording for forbidden_domain
+  Play.tsx               # the puzzle, the status bar and the win panel
+  Leaderboard.tsx        # the two toggles and the table
+  Header.tsx             # title, #N · date, nav link, profile menu (rename, sign out)
+  CompanyPicker.tsx      # typeahead over CompanyLite[]; excludes guessed ids; Enter picks first match; ↑/↓ to move
+  GuessGrid.tsx          # column-driven from COLUMN_DEFS (shared); newest guess on top; staggered reveal
+                         # animation; the cell (colour + arrow + displayValue) and the ISO-2 flag live here
+  GoogleButton.tsx       # GIS wrapper; loads the script on demand, never rendered in anonymous mode
   styles.css
 ```
+
+Flat, and fewer files than this doc first sketched: see `07-decisions.md` D16 for what merged and
+why. `formatElapsed` (the clock, the countdown and the share-text header must agree) comes from
+`@venturedle/shared`.
 
 Typeahead matching: case-insensitive `includes` on `name`, plus a match on `id` (domain) so typing
 "klarna.com" works; show at most 8; logos with `onError` hide-on-404.
@@ -101,8 +96,9 @@ what makes reload/resume trivial. A `401 unauthorized` on any authenticated call
 and returns to Onboarding (the session was revoked or the database was reset); a guess after a
 solve simply returns the same `PlayState`, so there is nothing to special-case.
 
-Midnight rollover while the tab is open: `useCountdown` reaching zero triggers a refetch of
-`puzzle/today` and `results/today` (and clears the grid).
+Midnight rollover while the tab is open: `useCountdown` reaching zero should trigger a refetch of
+`puzzle/today` and `results/today` (and clear the grid). Not built yet — it is on the Phase 6 list
+in `08-build-plan.md`; today the countdown runs to `00:00` and a reload picks up the new puzzle.
 
 ## Visual notes
 
@@ -134,12 +130,15 @@ are needed: everything the SPA must know at runtime (`authMode`, `googleClientId
 
 ## Tests
 
-Vitest + Testing Library, a handful of focused tests, mocking `fetch`:
+Vitest + Testing Library (jsdom), a handful of focused tests. `test/fake-api.ts` stubs `fetch` with
+routes keyed by `"<METHOD> <path>"` and records the calls; an unrouted request fails the test.
 
 - Onboarding renders the nickname form in anonymous mode and the Google button in google mode.
-- Play view calls `start` exactly once, renders guesses newest-first, disables the picker when solved.
-- Picker excludes guessed companies and picks the first match on Enter.
-- Leaderboard toggles change the query string and highlight `isMe`.
+- Play calls `start` exactly once (rendered inside `StrictMode`, whose double-invoked effects are
+  the thing worth guarding against), renders guesses newest-first, disables the picker and shows the
+  answer and the share text when solved, and shows the empty state when nothing is scheduled.
+- Picker excludes guessed companies, matches on the domain, and picks the highlighted match on Enter.
+- Leaderboard toggles change the query string, highlight `isMe`, and show the empty state.
 
 End-to-end (optional, phase 6): one Playwright script against `docker compose up` that creates a
 player, guesses the fixture answer and asserts the share text — it doubles as a deploy smoke test.

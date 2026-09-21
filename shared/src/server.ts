@@ -15,4 +15,4 @@ export {
   toCompanyLite,
 } from "./company.js";
 
-export { buildShareText, evaluateGuess, formatElapsed } from "./scoring.js";
+export { buildShareText, evaluateGuess } from "./scoring.js";

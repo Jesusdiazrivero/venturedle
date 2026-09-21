@@ -1,0 +1,449 @@
+/* Wordle-ish, hand-rolled, no framework. Colours are the v1 ones; dark mode follows the OS. */
+
+:root {
+  --green: #6aaa64;
+  --yellow: #c9b458;
+  --grey: #787c7e;
+  --bg: #ffffff;
+  --fg: #1a1a1b;
+  --muted: #6b7075;
+  --line: #d3d6da;
+  --panel: #f6f7f8;
+  --accent: #1a1a1b;
+  --cell-fg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121213;
+    --fg: #e9e9e9;
+    --muted: #9aa0a6;
+    --line: #3a3a3c;
+    --panel: #1e1e1f;
+    --accent: #e9e9e9;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-size: 16px;
+}
+
+#root {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 12px 48px;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+}
+
+input {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  color: #c0392b;
+  font-size: 0.9375rem;
+}
+
+.logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: contain;
+  flex: none;
+}
+
+/* ---- header ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+  margin-bottom: 20px;
+}
+
+.brand {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.puzzle-id {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.menu {
+  position: relative;
+}
+
+.menu > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: 28px;
+  z-index: 10;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+}
+
+.menu-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-panel label {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+/* ---- onboarding ---- */
+
+.onboarding {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  text-align: center;
+}
+
+.onboarding h1 {
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+
+.tagline {
+  color: var(--muted);
+  margin-top: 0;
+}
+
+.onboarding form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.google-button {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+/* ---- picker ---- */
+
+.picker {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.picker-input {
+  width: 100%;
+}
+
+.picker-list {
+  position: absolute;
+  z-index: 5;
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+}
+
+.picker-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.picker-list li.highlighted {
+  background: var(--panel);
+}
+
+/* ---- grid ---- */
+
+/* A Wordle grid is unreadable when it wraps, so narrow screens scroll it instead. */
+.grid-scroll {
+  overflow-x: auto;
+}
+
+.grid {
+  min-width: 720px;
+  display: grid;
+  gap: 4px;
+}
+
+.grid-head,
+.grid-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.grid-head {
+  font-size: 0.75rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding-bottom: 2px;
+}
+
+.grid-head > :first-child {
+  text-align: left;
+}
+
+.guess-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  padding: 6px 4px;
+  overflow: hidden;
+}
+
+.guess-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--cell-fg);
+  font-size: 0.8125rem;
+  line-height: 1.15;
+  text-align: center;
+  animation: flip 240ms ease-out both;
+}
+
+.cell.green {
+  background: var(--green);
+}
+
+.cell.yellow {
+  background: var(--yellow);
+}
+
+.cell.grey {
+  background: var(--grey);
+}
+
+.cell-value {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.cell-arrow {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+@keyframes flip {
+  from {
+    transform: rotateX(-90deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    animation: none;
+  }
+}
+
+.status {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 16px;
+}
+
+/* ---- win ---- */
+
+.win {
+  margin-top: 8px;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.win h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.win h2 .logo {
+  width: 28px;
+  height: 28px;
+}
+
+.share {
+  font-size: 1rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 12px 0;
+}
+
+.win-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.empty {
+  text-align: center;
+  padding: 10vh 0;
+}
+
+/* ---- leaderboard ---- */
+
+.toggles {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.toggle {
+  display: flex;
+}
+
+.toggle button {
+  border-radius: 0;
+}
+
+.toggle button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.toggle button:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.toggle button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.leaderboard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+}
+
+.leaderboard td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.leaderboard tr.me td {
+  background: var(--panel);
+  font-weight: 700;
+}
