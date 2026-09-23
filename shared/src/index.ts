@@ -20,6 +20,8 @@ export type { Region } from "./regions.js";
 
 export { COLUMN_DEFS } from "./columns.js";
 
+export { formatElapsed } from "./format.js";
+
 export type { CompanyLite } from "./company.js";
 
 export { API_ERROR_CODES } from "./api.js";

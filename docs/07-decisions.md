@@ -323,3 +323,123 @@ declare what it imports. It is the same version and the same install — nothing
 **No per-request log line.** The app logs boot, schedule reloads, reload failures and 500s — one
 line per *event*, as the convention says. Request logging is Caddy's job in production (D7), and a
 line per request would have buried the interesting ones and the test output alike.
+
+---
+
+### D16. The frontend is twelve flat modules, and `formatElapsed` moves to `shared`
+
+**Decision.** `frontend/src/` is twelve modules and one stylesheet, flat — no `views/` or
+`components/` directories — rather than the eighteen files `05-frontend.md` sketched. What merged,
+each an application of the simplicity rules in `CLAUDE.md`:
+
+- `hooks/{useHashRoute,useCountdown,useElapsed}.ts` → one `hooks.ts`. Three one-function modules
+  with one caller each (rule 1).
+- `Cell.tsx` → inside `GuessGrid.tsx`; the flag-emoji helper goes with it. A cell is only ever
+  rendered by the grid, and the two read as one component (rule 9).
+- `StatusBar.tsx` and `WinPanel.tsx` → inside `Play.tsx`. The status bar was four lines; the win
+  panel is the solved state of the play view and shares nothing with any other view.
+- `NicknameForm.tsx` → inside `Onboarding.tsx` for the sign-in form and inside `Header.tsx` for the
+  rename. They looked like one component and are not: one creates a player and one renames it, with
+  different buttons, errors and submit handlers. A shared form would have taken more props than it
+  saved lines.
+- `LeaderboardTable.tsx` → inside `Leaderboard.tsx`; it is the view.
+- `views/` + `components/` → one directory. Twelve files do not need a taxonomy, and the two that
+  are shared (`Header`, `GoogleButton`) would have made the split arbitrary anyway.
+
+`GoogleButton.tsx` stays its own file: loading a third-party script once, keeping GIS from
+re-initialising on every render, and never touching the network in anonymous mode is genuinely
+subtle, and it is the one place the SPA talks to something that is not our backend.
+
+**`formatElapsed` moves to `shared/src/format.ts`.** The running clock, the countdown, the solved
+time and the share-text header must all agree, and `shared/src/index.ts` may not re-export anything
+from `scoring.ts` (`test/entrypoints.test.ts` enforces that, because that is what keeps `Company`
+out of the SPA). A four-line file is the cheapest way to have one formatter instead of two.
+
+**The session token lives in a module-level store**, not in `useState`: `api.ts` has to clear it
+from any call that 401s, and `App` subscribes with `useSyncExternalStore`. That is what makes "the
+session was revoked" a one-line path — clear the token, the app re-renders into Onboarding — rather
+than an error threaded back through every view.
+
+**`POST /results/today/start` is fired once per date, guarded by a ref**, not by an effect that
+happens to run once: React 18 StrictMode double-invokes effects in dev, and the test renders `Play`
+inside `StrictMode` precisely to prove the second call does not happen.
+
+**Rejected.** A router library (two routes); a state library (`PlayState` from the server *is* the
+state); `@testing-library/jest-dom` (the four tests assert on text and properties, so the extra
+matchers earn nothing).
+
+---
+
+### D17. Phase 5 deviations: a narrower build install, and idempotent GCP scripts
+
+**Decision.** Three small departures from the sketches in `06-deployment.md`, all in the same
+direction — do less, and be safe to re-run.
+
+**The build stage installs two workspaces, not all four.** `06` wrote `npm ci --workspaces
+--include-workspace-root`, which pulls the extractor's four LangChain packages into a stage whose
+only job is `vite build`. `npm ci --workspace shared --workspace frontend --include-workspace-root`
+produces a byte-identical `frontend/dist` and skips the download. All four manifests are still
+copied first, because that is what the lockfile check needs — that part of the sketch was the
+point. The runtime stage already installed a subset this way.
+
+**`create-vm.sh` guards with `describe`, not `|| true`.** The sketch ended three commands with
+`|| true` so a re-run would not abort. That also swallows a real failure — a bad zone, a quota
+refusal, no permission — and leaves the script printing "VM ready" over the top of it. Each step
+now asks whether the thing exists and creates it only if it does not, so a genuine error still
+stops the run. (`disks add-resource-policies` keeps the fallback: attaching a policy twice is the
+one case where the error *is* the success condition and there is no cheap way to ask first.)
+
+**`deploy.sh` makes the remote directories before copying.** `06` flagged that `scp --recurse` on
+a file path flattens, and suggested creating the directory first *or* a second copy; it needs both
+— the second `scp` still has nowhere to land. One `ssh mkdir -p` covers `data/` and `extractor/`
+in the same breath, and it also means the script works against a VM whose startup script has not
+finished yet.
+
+**Not deviations, just choices the docs left open.** The README screenshot is the play view after
+three guesses against the example schedule (`docs/screenshot.png`); a solved board would have put
+an answer on the front page of the repo. `deploy/.env` is a required `env_file` rather than an
+optional one, because a missing file that silently yields `AUTH_MODE=anonymous` on a box you meant
+to lock to a Workspace domain is the wrong failure.
+
+---
+
+### D18. Phase 6: the e2e test is a deploy smoke test, and it replaces the `docker build` CI job
+
+**Decision.** Four small things, one of which is a new dev dependency and one of which changes CI.
+
+**`@playwright/test` (dev) and an `e2e/` directory that is not a workspace.** Three files —
+`playwright.config.ts`, `smoke.spec.ts`, `tsconfig.json` — outside the workspace list on purpose:
+a fifth workspace would join `npm test --workspaces`, and this test needs a server that is already
+up. It runs via `npm run test:e2e`, and the root `typecheck` gained `&& tsc -p e2e` so the spec is
+held to the same `strict` as everything else. Nothing reaches the image: the Dockerfile copies
+named directories, and `--omit=dev` keeps Playwright out of the runtime stage.
+
+**The spec does not start the stack.** No Playwright `webServer` block; it points at
+`E2E_BASE_URL` (default `http://localhost`). Starting compose from the test would have made the
+happy path one command, but the second half of what this test is for is pointing it at a box that
+is already deployed — `E2E_BASE_URL=https://your.host npm run test:e2e` — and a `webServer` that
+"reuses an existing server" makes "which server did I just test?" a question. Like
+`backend/scripts/smoke.sh`, it reads the answer from `data/companies.json`, which is what makes it
+a smoke test rather than a game.
+
+**CI: the `e2e` job replaces the `docker` job.** The old job ran `docker build .` on `main` and
+asserted only that the image builds. The new one builds the same image through
+`deploy/docker-compose.yml`, waits for `/api/health`, plays a whole game through Caddy and the
+SPA, and runs on every pull request — strictly more coverage than the build it replaces, for one
+extra minute. `check` also gained `npm run extract -- validate data/companies.example.json`: the
+committed schedule is both the keyless demo and the extractor's golden file, and a schema break
+there breaks `npm run dev` for everyone.
+
+**Rollover is `App`'s job, and it polls.** The countdown lives in `App` (which owns `puzzle`),
+not in `Play` (which is handed one), and reaching zero re-fetches `puzzle/today` every five
+seconds rather than once: the browser's clock can be ahead of the server's, so a single ask at
+`00:00:00` can legitimately hand back the day that just ended. The new `nextPuzzleAt` stops the
+poll by itself — there is no separate "did it work" flag. `Play` is keyed by `puzzle.date`, so
+the remount is what clears the board; no view has to reset its own state. One known dev-only
+edge: with `DEV_TODAY` pinned, the server's date never moves, so after the real midnight the poll
+keeps asking every five seconds. Deriving `nextPuzzleAt` from the pinned date instead would put it
+in the past and poll from the first render, which is worse; a production server does flip.
+
+**Already done in Phase 4, not re-done here:** the flag-emoji fallback (`GuessGrid`'s cached canvas
+measurement), picker keyboard navigation and the `aria-label`s were built with the views rather
+than bolted on afterwards, which is where they belonged.

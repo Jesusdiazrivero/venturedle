@@ -37,6 +37,7 @@ npm run extract -- validate data/companies.json
 npm test -w backend -- results                # one test file by name
 npm run example-schedule                      # keyless schedule starting today, from companies.example.json
 cd deploy && DOMAIN=:80 docker compose up -d --build           # production-like local run on :80 (needs deploy/.env)
+npx playwright install chromium && npm run test:e2e            # one real game against that stack (not part of `npm test`)
 ```
 
 Dev defaults come from the root `.env.example` (`AUTH_MODE=anonymous`,
@@ -96,6 +97,7 @@ args resolve against the repo root (`INIT_CWD`), whatever workspace the script r
 - Endpoints, schema, auth, leaderboard SQL: `docs/04-backend.md`
 - Views and components: `docs/05-frontend.md`
 - Docker/compose/GCP: `docs/06-deployment.md`
+- The end-to-end smoke test: `e2e/smoke.spec.ts` (needs a stack already running; see `06`)
 - Why it is like this: `docs/07-decisions.md`
 - What to build next: `docs/08-build-plan.md`
 

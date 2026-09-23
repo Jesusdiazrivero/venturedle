@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CellFeedback, GuessResult } from "../src/api.js";
-import { buildShareText, formatElapsed } from "../src/scoring.js";
+import { formatElapsed } from "../src/format.js";
+import { buildShareText } from "../src/scoring.js";
 
 /** A GuessResult whose only interesting part is its row of colours. */
 function row(colours: string, seq = 1): GuessResult {
