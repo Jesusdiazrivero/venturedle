@@ -38,6 +38,13 @@ jobs:
 
       # A keyless schedule starting today, so the container has a puzzle for the real UTC date.
       - run: npm run example-schedule
+
+      # The container is `USER node` (uid 1000) and creates venturedle.db inside the mounted
+      # `data/`, which the runner owns as uid 1001 — so without this the app cannot open the
+      # database and never becomes healthy. Same chown `deploy/gcp/startup.sh` does on a real
+      # host; see docs/06-deployment.md. Must run after example-schedule writes companies.json.
+      - run: sudo chown -R 1000:1000 data
+
       - name: Start the stack
         working-directory: deploy
         run: |
